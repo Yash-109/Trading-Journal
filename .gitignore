@@ -37,3 +37,4 @@ lerna-debug.log*
 # Vite
 dist-ssr
 *.local
+.vercel
