@@ -37,21 +37,23 @@ function App() {
   return (
     <AppProvider>
       <Router>
-        <div className="min-h-screen bg-dark-bg">
+        <div className="min-h-screen bg-dark-bg flex">
           <Navbar />
-          <DataSyncBanner />
-          <KeyboardShortcuts />
-          <main className="container mx-auto px-4 py-6 max-w-7xl">
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/journal" element={<Journal />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/reflection" element={<Reflection />} />
-              <Route path="/rules" element={<Rules />} />
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </main>
+          <div className="flex-1 min-w-0 transition-all duration-300">
+            <DataSyncBanner />
+            <KeyboardShortcuts />
+            <main className="container mx-auto px-4 py-6 max-w-7xl">
+              <Routes>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/journal" element={<Journal />} />
+                <Route path="/analytics" element={<Analytics />} />
+                <Route path="/reflection" element={<Reflection />} />
+                <Route path="/rules" element={<Rules />} />
+                <Route path="/settings" element={<Settings />} />
+              </Routes>
+            </main>
+          </div>
           <Toaster
             position="top-right"
             toastOptions={{
