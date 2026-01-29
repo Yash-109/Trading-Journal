@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
   BookOpen,
@@ -12,13 +13,20 @@ import {
   X,
   TrendingUp,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  LogOut
 } from 'lucide-react';
 
 const Navbar = () => {
   const location = useLocation();
+  const { logout, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const handleLogout = () => {
+    logout();
+    setIsMobileMenuOpen(false);
+  };
 
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -107,6 +115,23 @@ const Navbar = () => {
                   </Link>
                 );
               })}
+              
+              {/* Logout Button */}
+              <div className="mt-4 pt-4 border-t border-dark-border">
+                {user && (
+                  <div className="px-3 py-2 mb-2">
+                    <p className="text-xs text-gray-500">Logged in as:</p>
+                    <p className="text-sm text-gray-300 truncate">{user.email}</p>
+                  </div>
+                )}
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center space-x-3 px-3 py-2.5 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                >
+                  <LogOut className="w-5 h-5" />
+                  <span>Logout</span>
+                </button>
+              </div>
             </div>
           </motion.aside>
         </motion.div>
@@ -178,6 +203,26 @@ const Navbar = () => {
               </Link>
             );
           })}
+        </div>
+
+        {/* Logout Section */}
+        <div className="p-3 border-t border-dark-border">
+          {!isCollapsed && user && (
+            <div className="px-3 py-2 mb-2">
+              <p className="text-xs text-gray-500">Logged in as:</p>
+              <p className="text-sm text-gray-300 truncate">{user.email}</p>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center ${
+              isCollapsed ? 'justify-center' : 'space-x-3'
+            } px-3 py-2.5 rounded-lg text-gray-300 hover:bg-red-500/10 hover:text-red-400 transition-colors`}
+            title={isCollapsed ? 'Logout' : undefined}
+          >
+            <LogOut className="w-5 h-5" />
+            {!isCollapsed && <span>Logout</span>}
+          </button>
         </div>
       </motion.aside>
     </>
