@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useTrades } from '../hooks/useTrades';
 import TradeModal from '../components/TradeModal';
 import { 
   Plus, 
@@ -16,7 +17,11 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const Journal = () => {
-  const { trades = [], deleteTrade, addTrade } = useApp();
+  const { trades: rawTrades = [], deleteTrade, addTrade } = useApp();
+  
+  // Get normalized trades using centralized hook
+  const normalizedTrades = useTrades(rawTrades);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,11 +33,11 @@ const Journal = () => {
     ruleFollowed: '',
   });
 
-  // Filter trades
+  // Filter normalized trades
   const filteredTrades = useMemo(() => {
-    if (!trades || trades.length === 0) return [];
+    if (!normalizedTrades || normalizedTrades.length === 0) return [];
     
-    return trades.filter(trade => {
+    return normalizedTrades.filter(trade => {
       const matchesSearch = 
         (trade.pair || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (trade.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -48,7 +53,7 @@ const Journal = () => {
       return matchesSearch && matchesPair && matchesDirection && 
              matchesEmotion && matchesStrategy && matchesRules;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [trades, searchTerm, filters]);
+  }, [normalizedTrades, searchTerm, filters]);
 
   const handleEdit = (trade) => {
     setSelectedTrade(trade);
@@ -87,9 +92,9 @@ const Journal = () => {
     setSearchTerm('');
   };
 
-  // Get unique values for filters
-  const uniquePairs = [...new Set((trades || []).map(t => t.pair).filter(Boolean))];
-  const uniqueStrategies = [...new Set((trades || []).map(t => t.strategy).filter(Boolean))];
+  // Get unique values for filters from normalized trades
+  const uniquePairs = [...new Set((normalizedTrades || []).map(t => t.pair).filter(Boolean))];
+  const uniqueStrategies = [...new Set((normalizedTrades || []).map(t => t.strategy).filter(Boolean))];
   const emotions = ['Calm', 'Fear', 'Greed', 'Hesitant', 'Overconfident', 'Revenge'];
 
   return (
@@ -197,7 +202,7 @@ const Journal = () => {
 
         <div className="flex items-center justify-between">
           <p className="text-sm text-gray-400">
-            Showing {filteredTrades.length} of {trades.length} trades
+            Showing {filteredTrades.length} of {normalizedTrades.length} trades
           </p>
           <button
             onClick={resetFilters}
@@ -215,7 +220,7 @@ const Journal = () => {
             <Calendar className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h3 className="text-xl font-semibold text-white mb-2">No trades found</h3>
             <p className="text-gray-400 mb-6">
-              {trades.length === 0 
+              {normalizedTrades.length === 0 
                 ? "Start logging your trades to build your journal" 
                 : "Try adjusting your filters"}
             </p>
@@ -234,7 +239,7 @@ const Journal = () => {
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center space-x-4">
-                  <div className={`w-2 h-16 rounded ${(trade.profitLoss || 0) >= 0 ? 'bg-profit' : 'bg-loss'}`} />
+                  <div className={`w-2 h-16 rounded ${trade.pnl >= 0 ? 'bg-profit' : 'bg-loss'}`} />
                   <div>
                     <div className="flex items-center space-x-3 mb-2">
                       <h3 className="text-xl font-bold text-white">{trade.pair}</h3>
@@ -293,13 +298,13 @@ const Journal = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">P/L</p>
-                  <p className={`text-sm font-bold ${(trade.profitLoss || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {(trade.profitLoss || 0) >= 0 ? '+' : ''}{Number(trade.profitLoss || 0).toFixed(2)}
+                  <p className={`text-sm font-bold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {trade.pnl >= 0 ? '+' : ''}{Number(trade.pnl).toFixed(2)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">R:R</p>
-                  <p className="text-sm font-semibold text-gold-500">1:{Number(trade.rr || 0).toFixed(2)}</p>
+                  <p className="text-sm font-semibold text-gold-500">1:{Number(trade.rr).toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">Emotion</p>

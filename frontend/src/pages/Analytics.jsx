@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useTrades } from '../hooks/useTrades';
 import {
   BarChart,
   Bar,
@@ -21,22 +22,25 @@ import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 
 const Analytics = () => {
-  const { trades = [], settings } = useApp();
+  const { trades: rawTrades = [], settings } = useApp();
+  
+  // Get normalized trades using centralized hook
+  const normalizedTrades = useTrades(rawTrades);
 
-  // Analytics calculations
+  // Analytics calculations from normalized trades
   const analytics = useMemo(() => {
-    if (!trades || trades.length === 0) return null;
+    if (!normalizedTrades || normalizedTrades.length === 0) return null;
 
     // By Pair
     const byPair = {};
-    trades.forEach(trade => {
+    normalizedTrades.forEach(trade => {
       const pair = trade.pair || 'Unknown';
       if (!byPair[pair]) {
         byPair[pair] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
       byPair[pair].total++;
-      byPair[pair].pl += Number(trade.profitLoss || 0);
-      if (Number(trade.profitLoss || 0) > 0) byPair[pair].wins++;
+      byPair[pair].pl += trade.pnl;
+      if (trade.pnl > 0) byPair[pair].wins++;
       else byPair[pair].losses++;
     });
 
@@ -49,14 +53,14 @@ const Analytics = () => {
 
     // By Emotion
     const byEmotion = {};
-    trades.forEach(trade => {
+    normalizedTrades.forEach(trade => {
       const emotion = trade.emotion || 'Unknown';
       if (!byEmotion[emotion]) {
         byEmotion[emotion] = { count: 0, wins: 0, pl: 0 };
       }
       byEmotion[emotion].count++;
-      byEmotion[emotion].pl += Number(trade.profitLoss || 0);
-      if (Number(trade.profitLoss || 0) > 0) byEmotion[emotion].wins++;
+      byEmotion[emotion].pl += trade.pnl;
+      if (trade.pnl > 0) byEmotion[emotion].wins++;
     });
 
     const emotionData = Object.entries(byEmotion).map(([emotion, data]) => ({
@@ -68,14 +72,14 @@ const Analytics = () => {
 
     // By Session
     const bySession = {};
-    trades.forEach(trade => {
+    normalizedTrades.forEach(trade => {
       const session = trade.session || 'Unknown';
       if (!bySession[session]) {
         bySession[session] = { count: 0, wins: 0, pl: 0 };
       }
       bySession[session].count++;
-      bySession[session].pl += Number(trade.profitLoss || 0);
-      if (Number(trade.profitLoss || 0) > 0) bySession[session].wins++;
+      bySession[session].pl += trade.pnl;
+      if (trade.pnl > 0) bySession[session].wins++;
     });
 
     const sessionData = Object.entries(bySession).map(([session, data]) => ({
@@ -87,14 +91,14 @@ const Analytics = () => {
 
     // By Strategy
     const byStrategy = {};
-    trades.forEach(trade => {
+    normalizedTrades.forEach(trade => {
       const strategy = trade.strategy || 'None';
       if (!byStrategy[strategy]) {
         byStrategy[strategy] = { count: 0, wins: 0, pl: 0 };
       }
       byStrategy[strategy].count++;
-      byStrategy[strategy].pl += Number(trade.profitLoss || 0);
-      if (Number(trade.profitLoss || 0) > 0) byStrategy[strategy].wins++;
+      byStrategy[strategy].pl += trade.pnl;
+      if (trade.pnl > 0) byStrategy[strategy].wins++;
     });
 
     const strategyData = Object.entries(byStrategy).map(([strategy, data]) => ({
@@ -105,17 +109,17 @@ const Analytics = () => {
     }));
 
     // Rule Compliance
-    const rulesFollowed = trades.filter(t => t.ruleFollowed).length;
-    const rulesBroken = trades.length - rulesFollowed;
+    const rulesFollowed = normalizedTrades.filter(t => t.ruleFollowed).length;
+    const rulesBroken = normalizedTrades.length - rulesFollowed;
     const rulesData = [
       { name: 'Followed', value: rulesFollowed, color: '#10b981' },
       { name: 'Broken', value: rulesBroken, color: '#ef4444' },
     ];
 
     // Win/Loss Distribution
-    const wins = trades.filter(t => Number(t.profitLoss || 0) > 0).length;
-    const losses = trades.filter(t => Number(t.profitLoss || 0) < 0).length;
-    const breakeven = trades.filter(t => Number(t.profitLoss || 0) === 0).length;
+    const wins = normalizedTrades.filter(t => t.pnl > 0).length;
+    const losses = normalizedTrades.filter(t => t.pnl < 0).length;
+    const breakeven = normalizedTrades.filter(t => t.pnl === 0).length;
     const winLossData = [
       { name: 'Wins', value: wins, color: '#10b981' },
       { name: 'Losses', value: losses, color: '#ef4444' },
@@ -130,7 +134,7 @@ const Analytics = () => {
       rulesData,
       winLossData,
     };
-  }, [trades]);
+  }, [normalizedTrades]);
 
   const exportPDF = () => {
     try {
@@ -152,11 +156,11 @@ const Analytics = () => {
       y += 10;
       
       pdf.setFontSize(10);
-      const totalPL = trades.reduce((sum, t) => sum + Number(t.profitLoss || 0), 0);
-      const wins = trades.filter(t => Number(t.profitLoss || 0) > 0).length;
-      const winRate = trades.length > 0 ? (wins / trades.length) * 100 : 0;
+      const totalPL = normalizedTrades.reduce((sum, t) => sum + t.pnl, 0);
+      const wins = normalizedTrades.filter(t => t.pnl > 0).length;
+      const winRate = normalizedTrades.length > 0 ? (wins / normalizedTrades.length) * 100 : 0;
       
-      pdf.text(`Total Trades: ${trades.length}`, 20, y);
+      pdf.text(`Total Trades: ${normalizedTrades.length}`, 20, y);
       y += 7;
       pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
@@ -184,7 +188,7 @@ const Analytics = () => {
     }
   };
 
-  if (!analytics || trades.length === 0) {
+  if (!analytics || normalizedTrades.length === 0) {
     return (
       <div className="space-y-6 animate-slide-in">
         <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>

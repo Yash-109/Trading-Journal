@@ -111,6 +111,27 @@ export const authAPI = {
 
 // ============= TRADES API =============
 
+/**
+ * Normalize trade data for backend
+ * Maps frontend field names to backend field names
+ */
+const normalizeTradeForBackend = (trade) => {
+  const normalized = { ...trade };
+  
+  // Map profitLoss to pnl (backend uses pnl)
+  if (normalized.profitLoss !== undefined) {
+    normalized.pnl = normalized.profitLoss;
+    delete normalized.profitLoss;
+  }
+  
+  // Remove frontend-only fields
+  delete normalized.id; // Backend uses _id
+  delete normalized.isWin;
+  delete normalized.isLoss;
+  
+  return normalized;
+};
+
 export const tradesAPI = {
   /**
    * Get all trades for authenticated user
@@ -126,9 +147,10 @@ export const tradesAPI = {
    * POST /api/trades
    */
   create: async (trade) => {
+    const normalizedTrade = normalizeTradeForBackend(trade);
     const data = await apiRequest('/trades', {
       method: 'POST',
-      body: JSON.stringify(trade),
+      body: JSON.stringify(normalizedTrade),
     });
     return data.data;
   },
@@ -138,9 +160,10 @@ export const tradesAPI = {
    * PUT /api/trades/:id
    */
   update: async (id, trade) => {
+    const normalizedTrade = normalizeTradeForBackend(trade);
     const data = await apiRequest(`/trades/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(trade),
+      body: JSON.stringify(normalizedTrade),
     });
     return data.data;
   },

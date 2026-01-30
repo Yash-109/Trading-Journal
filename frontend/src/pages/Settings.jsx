@@ -24,6 +24,7 @@ const Settings = () => {
   const [newPair, setNewPair] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lastSaved, setLastSaved] = useState(null);
   const fileInputRef = useRef(null);
 
   // Check online status
@@ -50,6 +51,9 @@ const Settings = () => {
 
   const handleSave = async () => {
     await updateSettings(localSettings);
+    const now = new Date();
+    setLastSaved(now);
+    localStorage.setItem('lastSaved', now.toISOString());
   };
 
   const handleAddPair = () => {
