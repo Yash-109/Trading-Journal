@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useTrades } from '../hooks/useTrades';
 import {
   BarChart,
   Bar,
@@ -21,22 +22,26 @@ import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 
 const Analytics = () => {
-  const { trades, settings } = useApp();
+  const { trades: rawTrades = [], settings } = useApp();
+  
+  // Get normalized trades using centralized hook
+  const normalizedTrades = useTrades(rawTrades);
 
-  // Analytics calculations
+  // Analytics calculations from normalized trades
   const analytics = useMemo(() => {
-    if (trades.length === 0) return null;
+    if (!normalizedTrades || normalizedTrades.length === 0) return null;
 
     // By Pair
     const byPair = {};
-    trades.forEach(trade => {
-      if (!byPair[trade.pair]) {
-        byPair[trade.pair] = { wins: 0, losses: 0, total: 0, pl: 0 };
+    normalizedTrades.forEach(trade => {
+      const pair = trade.pair || 'Unknown';
+      if (!byPair[pair]) {
+        byPair[pair] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
-      byPair[trade.pair].total++;
-      byPair[trade.pair].pl += trade.profitLoss;
-      if (trade.profitLoss > 0) byPair[trade.pair].wins++;
-      else byPair[trade.pair].losses++;
+      byPair[pair].total++;
+      byPair[pair].pl += trade.pnl;
+      if (trade.pnl > 0) byPair[pair].wins++;
+      else byPair[pair].losses++;
     });
 
     const pairData = Object.entries(byPair).map(([pair, data]) => ({
@@ -48,13 +53,14 @@ const Analytics = () => {
 
     // By Emotion
     const byEmotion = {};
-    trades.forEach(trade => {
-      if (!byEmotion[trade.emotion]) {
-        byEmotion[trade.emotion] = { count: 0, wins: 0, pl: 0 };
+    normalizedTrades.forEach(trade => {
+      const emotion = trade.emotion || 'Unknown';
+      if (!byEmotion[emotion]) {
+        byEmotion[emotion] = { count: 0, wins: 0, pl: 0 };
       }
-      byEmotion[trade.emotion].count++;
-      byEmotion[trade.emotion].pl += trade.profitLoss;
-      if (trade.profitLoss > 0) byEmotion[trade.emotion].wins++;
+      byEmotion[emotion].count++;
+      byEmotion[emotion].pl += trade.pnl;
+      if (trade.pnl > 0) byEmotion[emotion].wins++;
     });
 
     const emotionData = Object.entries(byEmotion).map(([emotion, data]) => ({
@@ -66,13 +72,14 @@ const Analytics = () => {
 
     // By Session
     const bySession = {};
-    trades.forEach(trade => {
-      if (!bySession[trade.session]) {
-        bySession[trade.session] = { count: 0, wins: 0, pl: 0 };
+    normalizedTrades.forEach(trade => {
+      const session = trade.session || 'Unknown';
+      if (!bySession[session]) {
+        bySession[session] = { count: 0, wins: 0, pl: 0 };
       }
-      bySession[trade.session].count++;
-      bySession[trade.session].pl += trade.profitLoss;
-      if (trade.profitLoss > 0) bySession[trade.session].wins++;
+      bySession[session].count++;
+      bySession[session].pl += trade.pnl;
+      if (trade.pnl > 0) bySession[session].wins++;
     });
 
     const sessionData = Object.entries(bySession).map(([session, data]) => ({
@@ -84,14 +91,14 @@ const Analytics = () => {
 
     // By Strategy
     const byStrategy = {};
-    trades.forEach(trade => {
+    normalizedTrades.forEach(trade => {
       const strategy = trade.strategy || 'None';
       if (!byStrategy[strategy]) {
         byStrategy[strategy] = { count: 0, wins: 0, pl: 0 };
       }
       byStrategy[strategy].count++;
-      byStrategy[strategy].pl += trade.profitLoss;
-      if (trade.profitLoss > 0) byStrategy[strategy].wins++;
+      byStrategy[strategy].pl += trade.pnl;
+      if (trade.pnl > 0) byStrategy[strategy].wins++;
     });
 
     const strategyData = Object.entries(byStrategy).map(([strategy, data]) => ({
@@ -102,17 +109,17 @@ const Analytics = () => {
     }));
 
     // Rule Compliance
-    const rulesFollowed = trades.filter(t => t.ruleFollowed).length;
-    const rulesBroken = trades.length - rulesFollowed;
+    const rulesFollowed = normalizedTrades.filter(t => t.ruleFollowed).length;
+    const rulesBroken = normalizedTrades.length - rulesFollowed;
     const rulesData = [
       { name: 'Followed', value: rulesFollowed, color: '#10b981' },
       { name: 'Broken', value: rulesBroken, color: '#ef4444' },
     ];
 
     // Win/Loss Distribution
-    const wins = trades.filter(t => t.profitLoss > 0).length;
-    const losses = trades.filter(t => t.profitLoss < 0).length;
-    const breakeven = trades.filter(t => t.profitLoss === 0).length;
+    const wins = normalizedTrades.filter(t => t.pnl > 0).length;
+    const losses = normalizedTrades.filter(t => t.pnl < 0).length;
+    const breakeven = normalizedTrades.filter(t => t.pnl === 0).length;
     const winLossData = [
       { name: 'Wins', value: wins, color: '#10b981' },
       { name: 'Losses', value: losses, color: '#ef4444' },
@@ -127,7 +134,7 @@ const Analytics = () => {
       rulesData,
       winLossData,
     };
-  }, [trades]);
+  }, [normalizedTrades]);
 
   const exportPDF = () => {
     try {
@@ -149,15 +156,15 @@ const Analytics = () => {
       y += 10;
       
       pdf.setFontSize(10);
-      const totalPL = trades.reduce((sum, t) => sum + t.profitLoss, 0);
-      const wins = trades.filter(t => t.profitLoss > 0).length;
-      const winRate = (wins / trades.length) * 100;
+      const totalPL = normalizedTrades.reduce((sum, t) => sum + t.pnl, 0);
+      const wins = normalizedTrades.filter(t => t.pnl > 0).length;
+      const winRate = normalizedTrades.length > 0 ? (wins / normalizedTrades.length) * 100 : 0;
       
-      pdf.text(`Total Trades: ${trades.length}`, 20, y);
+      pdf.text(`Total Trades: ${normalizedTrades.length}`, 20, y);
       y += 7;
-      pdf.text(`Win Rate: ${winRate.toFixed(1)}%`, 20, y);
+      pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
-      pdf.text(`Total P/L: ${totalPL.toFixed(2)} ${settings.defaultCurrency}`, 20, y);
+      pdf.text(`Total P/L: ${Number(totalPL || 0).toFixed(2)} ${settings?.defaultCurrency || 'USD'}`, 20, y);
       y += 15;
 
       // Best Performing Pair
@@ -168,7 +175,7 @@ const Analytics = () => {
         
         pdf.setFontSize(10);
         analytics.pairData.slice(0, 5).forEach(pair => {
-          pdf.text(`${pair.pair}: ${pair.pl.toFixed(2)} (${pair.winRate.toFixed(1)}% WR, ${pair.trades} trades)`, 20, y);
+          pdf.text(`${pair.pair}: ${Number(pair.pl || 0).toFixed(2)} (${Number(pair.winRate || 0).toFixed(1)}% WR, ${pair.trades} trades)`, 20, y);
           y += 7;
         });
       }
@@ -181,7 +188,7 @@ const Analytics = () => {
     }
   };
 
-  if (!analytics || trades.length === 0) {
+  if (!analytics || normalizedTrades.length === 0) {
     return (
       <div className="space-y-6 animate-slide-in">
         <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>
@@ -315,21 +322,21 @@ const Analytics = () => {
       >
         <h3 className="text-xl font-semibold text-white mb-6">Win Rate by Pair</h3>
         <div className="space-y-4">
-          {analytics.pairData.map((pair, index) => (
+          {Array.isArray(analytics.pairData) && analytics.pairData.map((pair, index) => (
             <div key={pair.pair} className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-white font-semibold">{pair.pair}</span>
                 <span className="text-gray-400 text-sm">
-                  {pair.winRate.toFixed(1)}% ({pair.trades} trades)
+                  {Number(pair.winRate || 0).toFixed(1)}% ({pair.trades} trades)
                 </span>
               </div>
               <div className="w-full bg-dark-bg rounded-full h-3 overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
-                  animate={{ width: `${pair.winRate}%` }}
+                  animate={{ width: `${Math.min(100, Math.max(0, Number(pair.winRate || 0)))}%` }}
                   transition={{ delay: 0.3 + index * 0.1, duration: 0.5 }}
                   className={`h-full rounded-full ${
-                    pair.winRate >= 60 ? 'bg-profit' : pair.winRate >= 40 ? 'bg-gold-500' : 'bg-loss'
+                    (pair.winRate || 0) >= 60 ? 'bg-profit' : (pair.winRate || 0) >= 40 ? 'bg-gold-500' : 'bg-loss'
                   }`}
                 />
               </div>
@@ -374,7 +381,7 @@ const Analytics = () => {
       >
         <h3 className="text-xl font-semibold text-white mb-6">Emotion Analysis</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {analytics.emotionData.map((emotion, index) => (
+          {Array.isArray(analytics.emotionData) && analytics.emotionData.map((emotion, index) => (
             <div
               key={emotion.emotion}
               className="bg-dark-bg border border-dark-border rounded-lg p-4"
@@ -386,14 +393,14 @@ const Analytics = () => {
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">Win Rate</span>
-                  <span className={emotion.winRate >= 50 ? 'text-profit' : 'text-loss'}>
-                    {emotion.winRate.toFixed(1)}%
+                  <span className={(emotion.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                    {Number(emotion.winRate || 0).toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">P/L</span>
-                  <span className={emotion.pl >= 0 ? 'text-profit' : 'text-loss'}>
-                    {emotion.pl >= 0 ? '+' : ''}{emotion.pl.toFixed(2)}
+                  <span className={(emotion.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                    {(emotion.pl || 0) >= 0 ? '+' : ''}{Number(emotion.pl || 0).toFixed(2)}
                   </span>
                 </div>
               </div>
@@ -422,20 +429,20 @@ const Analytics = () => {
                 </tr>
               </thead>
               <tbody>
-                {analytics.strategyData
-                  .sort((a, b) => b.pl - a.pl)
+                {Array.isArray(analytics.strategyData) && analytics.strategyData
+                  .sort((a, b) => (b.pl || 0) - (a.pl || 0))
                   .map((strategy, index) => (
                     <tr key={index} className="border-b border-dark-border/50">
                       <td className="py-3 px-4 text-white font-semibold">{strategy.strategy}</td>
                       <td className="py-3 px-4 text-gray-300">{strategy.count}</td>
                       <td className="py-3 px-4">
-                        <span className={strategy.winRate >= 50 ? 'text-profit' : 'text-loss'}>
-                          {strategy.winRate.toFixed(1)}%
+                        <span className={(strategy.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                          {Number(strategy.winRate || 0).toFixed(1)}%
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`font-semibold ${strategy.pl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {strategy.pl >= 0 ? '+' : ''}{strategy.pl.toFixed(2)}
+                        <span className={`font-semibold ${(strategy.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {(strategy.pl || 0) >= 0 ? '+' : ''}{Number(strategy.pl || 0).toFixed(2)}
                         </span>
                       </td>
                     </tr>

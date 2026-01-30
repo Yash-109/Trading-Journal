@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useTrades, useTradeStats } from '../hooks/useTrades';
 import StatCard from '../components/StatCard';
 import { 
   TrendingUp, 
@@ -16,77 +17,22 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
 
 const Dashboard = () => {
-  const { trades, reflections } = useApp();
+  const { trades: rawTrades = [], reflections = [] } = useApp();
+  
+  // Get normalized trades and statistics using centralized hooks
+  const trades = useTrades(rawTrades);
+  const stats = useTradeStats(trades);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    if (trades.length === 0) {
-      return {
-        totalTrades: 0,
-        winRate: 0,
-        avgRR: 0,
-        totalProfit: 0,
-        winningTrades: 0,
-        losingTrades: 0,
-        bestTrade: 0,
-        worstTrade: 0,
-        avgProfit: 0,
-        consistencyScore: 0,
-        currentStreak: 0,
-        streakType: 'none',
-      };
-    }
-
-    const winningTrades = trades.filter(t => t.profitLoss > 0);
-    const losingTrades = trades.filter(t => t.profitLoss < 0);
-    const totalProfit = trades.reduce((sum, t) => sum + t.profitLoss, 0);
-    const avgRR = trades.reduce((sum, t) => sum + t.rr, 0) / trades.length;
-    const rulesFollowed = trades.filter(t => t.ruleFollowed).length;
-    const consistencyScore = (rulesFollowed / trades.length) * 100;
-
-    // Calculate streak
-    const sortedTrades = [...trades].sort((a, b) => new Date(b.date) - new Date(a.date));
-    let currentStreak = 0;
-    let streakType = 'none';
-    
-    if (sortedTrades.length > 0) {
-      const isWin = sortedTrades[0].profitLoss > 0;
-      streakType = isWin ? 'win' : 'loss';
-      
-      for (let trade of sortedTrades) {
-        if (isWin && trade.profitLoss > 0) {
-          currentStreak++;
-        } else if (!isWin && trade.profitLoss < 0) {
-          currentStreak++;
-        } else {
-          break;
-        }
-      }
-    }
-
-    return {
-      totalTrades: trades.length,
-      winRate: trades.length > 0 ? (winningTrades.length / trades.length) * 100 : 0,
-      avgRR,
-      totalProfit,
-      winningTrades: winningTrades.length,
-      losingTrades: losingTrades.length,
-      bestTrade: Math.max(...trades.map(t => t.profitLoss)),
-      worstTrade: Math.min(...trades.map(t => t.profitLoss)),
-      avgProfit: totalProfit / trades.length,
-      consistencyScore,
-      currentStreak,
-      streakType,
-    };
-  }, [trades]);
-
-  // Equity curve data
+  // Equity curve data - shows cumulative P/L over time
   const equityData = useMemo(() => {
+    if (!trades || trades.length === 0) return [];
+    
+    // Sort trades by date (oldest first) for cumulative calculation
     const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
     let cumulative = 0;
     
     return sortedTrades.map((trade, index) => {
-      cumulative += trade.profitLoss;
+      cumulative += trade.pnl;
       return {
         date: format(new Date(trade.date), 'MMM dd'),
         equity: cumulative,
@@ -95,8 +41,10 @@ const Dashboard = () => {
     });
   }, [trades]);
 
-  // Recent trades
+  // Recent trades - sorted by date (newest first)
   const recentTrades = useMemo(() => {
+    if (!trades || trades.length === 0) return [];
+    
     return [...trades]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
@@ -153,21 +101,21 @@ const Dashboard = () => {
         />
         <StatCard
           title="Win Rate"
-          value={`${stats.winRate.toFixed(1)}%`}
+          value={`${Number(stats.winRate || 0).toFixed(1)}%`}
           icon={Target}
           color={stats.winRate >= 50 ? 'profit' : 'loss'}
         />
         <StatCard
           title="Average R:R"
-          value={`1:${stats.avgRR.toFixed(2)}`}
+          value={`1:${Number(stats.avgRR || 0).toFixed(2)}`}
           icon={Activity}
           color="gold"
         />
         <StatCard
           title="Total P/L"
-          value={`${stats.totalProfit >= 0 ? '+' : ''}${stats.totalProfit.toFixed(2)}`}
+          value={`${stats.totalPnL >= 0 ? '+' : ''}${Number(stats.totalPnL || 0).toFixed(2)}`}
           icon={DollarSign}
-          color={stats.totalProfit >= 0 ? 'profit' : 'loss'}
+          color={stats.totalPnL >= 0 ? 'profit' : 'loss'}
         />
       </div>
 
@@ -191,11 +139,11 @@ const Dashboard = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Best Trade</span>
-              <span className="text-profit font-semibold">+{stats.bestTrade.toFixed(2)}</span>
+              <span className="text-profit font-semibold">+{Number(stats.bestTrade || 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Worst Trade</span>
-              <span className="text-loss font-semibold">{stats.worstTrade.toFixed(2)}</span>
+              <span className="text-loss font-semibold">{Number(stats.worstTrade || 0).toFixed(2)}</span>
             </div>
           </div>
         </motion.div>
@@ -210,12 +158,12 @@ const Dashboard = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Consistency Score</span>
-              <span className="text-gold-500 font-semibold">{stats.consistencyScore.toFixed(1)}%</span>
+              <span className="text-gold-500 font-semibold">{Number(stats.consistencyScore || 0).toFixed(1)}%</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Avg Profit/Trade</span>
-              <span className={`font-semibold ${stats.avgProfit >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {stats.avgProfit >= 0 ? '+' : ''}{stats.avgProfit.toFixed(2)}
+              <span className={`font-semibold ${stats.avgPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
+                {stats.avgPnL >= 0 ? '+' : ''}{Number(stats.avgPnL || 0).toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -257,7 +205,7 @@ const Dashboard = () => {
                 <span className="text-gray-300">Consider reducing position size</span>
               </div>
             )}
-            {stats.totalProfit >= 0 && (
+            {stats.totalPnL >= 0 && (
               <div className="flex items-start space-x-2 text-sm">
                 <Award className="w-4 h-4 text-green-500 mt-0.5" />
                 <span className="text-gray-300">Great job! You're profitable</span>
@@ -344,7 +292,7 @@ const Dashboard = () => {
               </thead>
               <tbody>
                 {recentTrades.map((trade) => (
-                  <tr key={trade.id} className="border-b border-dark-border/50 hover:bg-dark-hover transition-colors">
+                  <tr key={trade.id || trade._id} className="border-b border-dark-border/50 hover:bg-dark-hover transition-colors">
                     <td className="py-3 px-4 text-sm text-gray-300">
                       {format(new Date(trade.date), 'MMM dd, yyyy')}
                     </td>
@@ -356,10 +304,10 @@ const Dashboard = () => {
                         {trade.direction}
                       </span>
                     </td>
-                    <td className={`py-3 px-4 text-sm font-semibold ${trade.profitLoss >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {trade.profitLoss >= 0 ? '+' : ''}{trade.profitLoss.toFixed(2)}
+                    <td className={`py-3 px-4 text-sm font-semibold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {trade.pnl >= 0 ? '+' : ''}{Number(trade.pnl).toFixed(2)}
                     </td>
-                    <td className="py-3 px-4 text-sm text-gray-300">1:{trade.rr.toFixed(2)}</td>
+                    <td className="py-3 px-4 text-sm text-gray-300">1:{Number(trade.rr).toFixed(2)}</td>
                     <td className="py-3 px-4 text-sm text-gray-300">{trade.emotion}</td>
                     <td className="py-3 px-4 text-sm">
                       {trade.ruleFollowed ? (

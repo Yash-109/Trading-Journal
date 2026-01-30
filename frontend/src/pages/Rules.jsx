@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 const Rules = () => {
-  const { rules, addRule, updateRule, deleteRule, trades } = useApp();
+  const { rules = [], addRule, updateRule, deleteRule, trades = [] } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
   const [ruleText, setRuleText] = useState('');
@@ -16,8 +16,8 @@ const Rules = () => {
     rulesFollowed: trades.filter(t => t.ruleFollowed).length,
     rulesBroken: trades.filter(t => !t.ruleFollowed).length,
     complianceRate: trades.length > 0 
-      ? ((trades.filter(t => t.ruleFollowed).length / trades.length) * 100).toFixed(1)
-      : 0,
+      ? Number(((trades.filter(t => t.ruleFollowed).length / trades.length) * 100) || 0).toFixed(1)
+      : '0.0',
   };
 
   const handleSubmit = async (e) => {
@@ -209,7 +209,7 @@ const Rules = () => {
                     <Edit2 className="w-4 h-4 text-gray-400 hover:text-gold-500" />
                   </button>
                   <button
-                    onClick={() => handleDelete(rule.id)}
+                    onClick={() => handleDelete(rule._id || rule.id)}
                     className="p-2 hover:bg-dark-hover rounded-lg transition-colors"
                   >
                     <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-500" />

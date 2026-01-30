@@ -87,7 +87,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         }
       }
       
-      setFormData(prev => ({ ...prev, profitLoss: pl, rr: parseFloat(rr.toFixed(2)) }));
+      setFormData(prev => ({ ...prev, profitLoss: pl, rr: parseFloat(Number(rr || 0).toFixed(2)) }));
     }
   }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize]);
 
@@ -344,14 +344,14 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-dark-bg rounded-lg border border-dark-border">
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Profit/Loss</label>
-                  <p className={`text-2xl font-bold ${formData.profitLoss >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {formData.profitLoss >= 0 ? '+' : ''}{formData.profitLoss.toFixed(2)} {settings.defaultCurrency}
+                  <p className={`text-2xl font-bold ${(formData.profitLoss || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {(formData.profitLoss || 0) >= 0 ? '+' : ''}{Number(formData.profitLoss || 0).toFixed(2)} {settings?.defaultCurrency || 'USD'}
                   </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Risk:Reward Ratio</label>
                   <p className="text-2xl font-bold text-gold-500">
-                    1:{formData.rr.toFixed(2)}
+                    1:{Number(formData.rr || 0).toFixed(2)}
                   </p>
                 </div>
               </div>

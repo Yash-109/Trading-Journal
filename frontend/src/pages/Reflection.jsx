@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 const Reflection = () => {
-  const { reflections, addReflection, deleteReflection } = useApp();
+  const { reflections = [], addReflection, deleteReflection } = useApp();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -56,7 +56,8 @@ const Reflection = () => {
 
   const handleDelete = async () => {
     if (currentReflection && window.confirm('Are you sure you want to delete this reflection?')) {
-      await deleteReflection(currentReflection.date);
+      const id = currentReflection._id || currentReflection.id;
+      await deleteReflection(id);
     }
   };
 

@@ -19,12 +19,12 @@ import {
 import toast from 'react-hot-toast';
 
 const Settings = () => {
-  const { settings, updateSettings, exportData, importData, saveToLocal, loadFromLocal, trades, reflections, rules } = useApp();
+  const { settings, updateSettings, exportData, importData, trades, reflections, rules } = useApp();
   const [localSettings, setLocalSettings] = useState(settings);
   const [newPair, setNewPair] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
-  const [lastSaved, setLastSaved] = useState(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [lastSaved, setLastSaved] = useState(null);
   const fileInputRef = useRef(null);
 
   // Check online status
@@ -51,6 +51,9 @@ const Settings = () => {
 
   const handleSave = async () => {
     await updateSettings(localSettings);
+    const now = new Date();
+    setLastSaved(now);
+    localStorage.setItem('lastSaved', now.toISOString());
   };
 
   const handleAddPair = () => {
@@ -101,27 +104,10 @@ const Settings = () => {
     }
   };
 
-  const handleSaveLocal = async () => {
-    const success = await saveToLocal();
-    if (success) {
-      setLastSaved(new Date());
-    }
-  };
-
-  const handleLoadLocal = async () => {
-    if (window.confirm('This will replace your current data with saved local data. Continue?')) {
-      const success = await loadFromLocal();
-      if (success) {
-        setTimeout(() => window.location.reload(), 1000);
-      }
-    }
-  };
-
   const handleClearAllData = () => {
     if (window.confirm('⚠️ WARNING: This will delete ALL your data including trades, reflections, and rules. This action cannot be undone. Are you absolutely sure?')) {
       if (window.confirm('This is your final warning. All data will be permanently deleted. Continue?')) {
-        // Clear IndexedDB
-        indexedDB.deleteDatabase('TradingJournalDB');
+        // TODO: Implement clear all data via backend API
         toast.success('All data cleared. Reloading...');
         setTimeout(() => {
           window.location.reload();
@@ -342,33 +328,19 @@ const Settings = () => {
           <div className="bg-dark-bg rounded-lg p-4 border border-dark-border">
             <p className="text-gray-400 text-sm mb-1">Data Size</p>
             <p className="text-2xl font-bold text-white">
-              {(dataStats.totalSize / 1024).toFixed(1)} KB
+              {Number((dataStats.totalSize || 0) / 1024).toFixed(1)} KB
             </p>
           </div>
         </div>
 
         <div className="space-y-3">
-          {/* Local Storage Actions */}
+          {/* Export/Import Actions */}
           <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
             <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center space-x-2">
-              <HardDrive className="w-4 h-4" />
-              <span>Local Storage (This Device)</span>
+              <Cloud className="w-4 h-4" />
+              <span>Backup & Restore</span>
             </h3>
             <div className="space-y-2">
-              <button
-                onClick={handleSaveLocal}
-                className="w-full flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
-              >
-                <Save className="w-5 h-5" />
-                <span>Save Data Locally</span>
-              </button>
-              <button
-                onClick={handleLoadLocal}
-                className="w-full flex items-center justify-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
-              >
-                <Upload className="w-5 h-5" />
-                <span>Load Local Data</span>
-              </button>
             </div>
           </div>
 
