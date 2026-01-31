@@ -39,6 +39,50 @@ export const createTrade = async (req, res) => {
       date 
     } = req.body;
     
+    // Calculate P/L and R:R
+    let calculatedPnl = pnl || 0;
+    let calculatedRr = rr || 0;
+    
+    if (entry && exit) {
+      const entryPrice = parseFloat(entry);
+      const exitPrice = parseFloat(exit);
+      
+      // P/L calculation based on market type
+      if (market === 'INDIAN' && quantity) {
+        const qty = parseFloat(quantity);
+        // Indian market: quantity-based calculation
+        if (direction === 'Buy') {
+          calculatedPnl = (exitPrice - entryPrice) * qty;
+        } else if (direction === 'Sell') {
+          calculatedPnl = (entryPrice - exitPrice) * qty;
+        }
+      } else if (lotSize) {
+        // FOREX/CRYPTO: lot-based calculation
+        const lot = parseFloat(lotSize);
+        if (direction === 'Buy') {
+          calculatedPnl = (exitPrice - entryPrice) * lot;
+        } else if (direction === 'Sell') {
+          calculatedPnl = (entryPrice - exitPrice) * lot;
+        }
+      }
+      
+      // R:R calculation (same for all markets)
+      if (stopLoss && takeProfit) {
+        const slPrice = parseFloat(stopLoss);
+        const tpPrice = parseFloat(takeProfit);
+        
+        if (direction === 'Buy') {
+          const risk = entryPrice - slPrice;
+          const reward = tpPrice - entryPrice;
+          calculatedRr = risk !== 0 ? reward / risk : 0;
+        } else if (direction === 'Sell') {
+          const risk = slPrice - entryPrice;
+          const reward = entryPrice - tpPrice;
+          calculatedRr = risk !== 0 ? reward / risk : 0;
+        }
+      }
+    }
+    
     // Create trade with userId from auth middleware
     const trade = await Trade.create({
       userId: req.user.userId,
@@ -59,8 +103,8 @@ export const createTrade = async (req, res) => {
       strikePrice,
       expiryDate,
       // Common fields
-      pnl,
-      rr,
+      pnl: calculatedPnl,
+      rr: calculatedRr,
       session,
       strategy,
       ruleFollowed,
@@ -173,6 +217,50 @@ export const updateTrade = async (req, res) => {
       date 
     } = req.body;
 
+    // Calculate P/L and R:R
+    let calculatedPnl = pnl || 0;
+    let calculatedRr = rr || 0;
+    
+    if (entry && exit) {
+      const entryPrice = parseFloat(entry);
+      const exitPrice = parseFloat(exit);
+      
+      // P/L calculation based on market type
+      if (market === 'INDIAN' && quantity) {
+        const qty = parseFloat(quantity);
+        // Indian market: quantity-based calculation
+        if (direction === 'Buy') {
+          calculatedPnl = (exitPrice - entryPrice) * qty;
+        } else if (direction === 'Sell') {
+          calculatedPnl = (entryPrice - exitPrice) * qty;
+        }
+      } else if (lotSize) {
+        // FOREX/CRYPTO: lot-based calculation
+        const lot = parseFloat(lotSize);
+        if (direction === 'Buy') {
+          calculatedPnl = (exitPrice - entryPrice) * lot;
+        } else if (direction === 'Sell') {
+          calculatedPnl = (entryPrice - exitPrice) * lot;
+        }
+      }
+      
+      // R:R calculation (same for all markets)
+      if (stopLoss && takeProfit) {
+        const slPrice = parseFloat(stopLoss);
+        const tpPrice = parseFloat(takeProfit);
+        
+        if (direction === 'Buy') {
+          const risk = entryPrice - slPrice;
+          const reward = tpPrice - entryPrice;
+          calculatedRr = risk !== 0 ? reward / risk : 0;
+        } else if (direction === 'Sell') {
+          const risk = slPrice - entryPrice;
+          const reward = entryPrice - tpPrice;
+          calculatedRr = risk !== 0 ? reward / risk : 0;
+        }
+      }
+    }
+
     const trade = await Trade.findOneAndUpdate(
       {
         _id: req.params.id,
@@ -196,8 +284,8 @@ export const updateTrade = async (req, res) => {
         strikePrice,
         expiryDate,
         // Common fields
-        pnl,
-        rr,
+        pnl: calculatedPnl,
+        rr: calculatedRr,
         session,
         strategy,
         ruleFollowed,

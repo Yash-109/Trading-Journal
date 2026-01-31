@@ -75,20 +75,39 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
 
   // Calculate P/L and RR
   useEffect(() => {
-    const { entry, exit, stopLoss, takeProfit, direction, lotSize } = formData;
+    const { entry, exit, stopLoss, takeProfit, direction, lotSize, market, quantity } = formData;
     
-    if (entry && exit && lotSize) {
+    // Determine if we have the required fields for calculation
+    const hasForexFields = entry && exit && lotSize;
+    const hasIndianFields = entry && exit && quantity;
+    
+    if ((market === 'INDIAN' && hasIndianFields) || (market !== 'INDIAN' && hasForexFields)) {
       const entryPrice = parseFloat(entry);
       const exitPrice = parseFloat(exit);
-      const lot = parseFloat(lotSize);
       
       let pl = 0;
-      if (direction === 'Buy') {
-        pl = (exitPrice - entryPrice) * lot;
+      
+      if (market === 'INDIAN') {
+        // Indian market: quantity-based calculation
+        const qty = parseFloat(quantity);
+        
+        if (direction === 'Buy') {
+          pl = (exitPrice - entryPrice) * qty;
+        } else {
+          pl = (entryPrice - exitPrice) * qty;
+        }
       } else {
-        pl = (entryPrice - exitPrice) * lot;
+        // FOREX/CRYPTO: lot-based calculation
+        const lot = parseFloat(lotSize);
+        
+        if (direction === 'Buy') {
+          pl = (exitPrice - entryPrice) * lot;
+        } else {
+          pl = (entryPrice - exitPrice) * lot;
+        }
       }
       
+      // R:R calculation (same for all markets)
       let rr = 0;
       if (stopLoss && takeProfit) {
         const slPrice = parseFloat(stopLoss);
@@ -107,7 +126,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
       
       setFormData(prev => ({ ...prev, profitLoss: pl, rr: parseFloat(Number(rr || 0).toFixed(2)) }));
     }
-  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize]);
+  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize, formData.market, formData.quantity]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -126,7 +145,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         alert('Please fill in required fields: Symbol, Entry, and Exit');
         return;
       }
-      
+
       if (formData.instrumentType === 'FNO') {
         if (!formData.optionType || !formData.strikePrice || !formData.expiryDate) {
           alert('Please fill in required F&O fields: Option Type, Strike Price, and Expiry Date');
