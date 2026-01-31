@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { Plus, Edit2, Trash2, X, Check, AlertCircle } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { Plus, Edit2, Trash2, X, AlertCircle } from 'lucide-react';
 
 const Rules = () => {
   const { rules = [], addRule, updateRule, deleteRule, trades = [] } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState(null);
-  const [ruleText, setRuleText] = useState('');
+  const [ruleTitle, setRuleTitle] = useState('');
+  const [ruleDescription, setRuleDescription] = useState('');
 
   // Calculate rule compliance stats
   const ruleStats = {
@@ -22,26 +22,31 @@ const Rules = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!ruleText.trim()) return;
+    if (!ruleTitle.trim()) return;
 
     if (editingRule) {
-      await updateRule({ ...editingRule, text: ruleText });
+      await updateRule({ 
+        ...editingRule, 
+        title: ruleTitle,
+        description: ruleDescription 
+      });
     } else {
       await addRule({
-        id: uuidv4(),
-        text: ruleText,
-        active: true,
+        title: ruleTitle,
+        description: ruleDescription,
       });
     }
 
-    setRuleText('');
+    setRuleTitle('');
+    setRuleDescription('');
     setIsModalOpen(false);
     setEditingRule(null);
   };
 
   const handleEdit = (rule) => {
     setEditingRule(rule);
-    setRuleText(rule.text);
+    setRuleTitle(rule.title || '');
+    setRuleDescription(rule.description || '');
     setIsModalOpen(true);
   };
 
@@ -51,13 +56,13 @@ const Rules = () => {
     }
   };
 
-  const toggleActive = async (rule) => {
-    await updateRule({ ...rule, active: !rule.active });
-  };
+  // Note: Active toggle removed as backend doesn't support active field
+  // If needed, this feature can be added to backend Rule model
 
   const handleAddNew = () => {
     setEditingRule(null);
-    setRuleText('');
+    setRuleTitle('');
+    setRuleDescription('');
     setIsModalOpen(true);
   };
 
@@ -106,9 +111,9 @@ const Rules = () => {
           transition={{ delay: 0.1 }}
           className="bg-dark-card border border-dark-border rounded-xl p-6"
         >
-          <p className="text-gray-400 text-sm mb-2">Active Rules</p>
+          <p className="text-gray-400 text-sm mb-2">Total Trades</p>
           <p className="text-3xl font-bold text-gold-500">
-            {rules.filter(r => r.active).length}
+            {ruleStats.totalTrades}
           </p>
         </motion.div>
 
@@ -174,31 +179,21 @@ const Rules = () => {
           <div className="space-y-3">
             {rules.map((rule, index) => (
               <motion.div
-                key={rule.id}
+                key={rule._id || rule.id}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.05 }}
-                className={`flex items-start space-x-4 p-4 rounded-lg border transition-all ${
-                  rule.active
-                    ? 'bg-dark-bg border-gold-500/30 hover:border-gold-500/50'
-                    : 'bg-dark-bg/50 border-dark-border opacity-60'
-                }`}
+                className="flex items-start space-x-4 p-4 rounded-lg border bg-dark-bg border-gold-500/30 hover:border-gold-500/50 transition-all"
               >
-                <button
-                  onClick={() => toggleActive(rule)}
-                  className={`mt-1 flex-shrink-0 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
-                    rule.active
-                      ? 'bg-gold-500 border-gold-500'
-                      : 'border-gray-600 hover:border-gray-500'
-                  }`}
-                >
-                  {rule.active && <Check className="w-4 h-4 text-black" />}
-                </button>
-
                 <div className="flex-1">
-                  <p className={`text-base ${rule.active ? 'text-white' : 'text-gray-500'}`}>
-                    {rule.text}
-                  </p>
+                  <h3 className="text-base font-semibold text-white mb-1">
+                    {rule.title}
+                  </h3>
+                  {rule.description && (
+                    <p className="text-sm text-gray-400">
+                      {rule.description}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center space-x-2 flex-shrink-0">
@@ -234,7 +229,8 @@ const Rules = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
               onClick={() => {
-                setRuleText(suggestion);
+                setRuleTitle(suggestion);
+                setRuleDescription('');
                 setIsModalOpen(true);
               }}
               className="text-left p-4 bg-dark-bg border border-dark-border rounded-lg hover:border-gold-500/30 transition-all group"
@@ -281,19 +277,34 @@ const Rules = () => {
                 </div>
 
                 {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6">
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Rule Description
-                  </label>
-                  <textarea
-                    value={ruleText}
-                    onChange={(e) => setRuleText(e.target.value)}
-                    placeholder="Enter your trading rule..."
-                    rows="4"
-                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent resize-none"
-                    required
-                    autoFocus
-                  />
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Rule Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={ruleTitle}
+                      onChange={(e) => setRuleTitle(e.target.value)}
+                      placeholder="Enter rule title..."
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      value={ruleDescription}
+                      onChange={(e) => setRuleDescription(e.target.value)}
+                      placeholder="Add additional details about this rule..."
+                      rows="3"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent resize-none"
+                    />
+                  </div>
 
                   {/* Actions */}
                   <div className="flex items-center justify-end space-x-3 mt-6">
