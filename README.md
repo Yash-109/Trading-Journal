@@ -1,122 +1,176 @@
 # 📊 Trading Journal Pro+
 
 [![Live Demo](https://img.shields.io/badge/🚀%20Live%20Demo-Visit%20App-success?style=for-the-badge)](https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app)
-[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/Aryan1438/Trading_Journal)
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?style=for-the-badge&logo=github)](https://github.com/Yash-109/Trading-Journal)
 [![Made with React](https://img.shields.io/badge/Made%20with-React-61DAFB?style=for-the-badge&logo=react)](https://reactjs.org/)
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
 
-**Professional-Grade Trading Journal for Active Traders** 🚀
+**Professional full-stack trading journal for disciplined traders**
 
-A comprehensive web application designed to help traders track, analyze, and improve their trading performance with advanced analytics, daily reflections, and rule management.
-
----
-
-## 🌐 Live Links
-
-- **🚀 Live App:** https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app
-- **📂 GitHub Repo:** https://github.com/Aryan1438/Trading_Journal
-- **📊 Vercel Dashboard:** https://vercel.com/patelaryan2106-5559s-projects/trade-journal
+Track every trade, analyze patterns, maintain discipline, and improve your trading performance through data-driven insights.
 
 ---
 
-## ✨ Key Features
+## ✨ Features
 
-### 📈 **Dashboard**
-- Real-time performance metrics (Win Rate, Total P/L, Average RR)
-- Interactive equity curve visualization
-- Advanced filtering by date range
-- Motivational trading quotes
-
-### 📝 **Trade Journal**
-- Complete trade logging system with all essential fields
-- Auto-calculated P/L and Risk:Reward ratios
-- Advanced search and filtering (by pair, date, emotion, strategy)
-- Edit and delete functionality with confirmation
-
-### 📊 **Analytics**
-- 6+ interactive charts:
-  - Equity curve over time
-  - Win rate pie chart
-  - Performance by currency pair
-  - Emotion distribution analysis
-  - Session performance comparison
-  - Strategy effectiveness breakdown
-- Auto-generated insights and recommendations
-
-### 🧠 **Daily Reflection**
-- Daily journaling with mood tracking
-- Prompted reflection questions
-- Calendar view of past entries
-- Track trading psychology patterns
-
-### 📋 **Trading Rules**
-- Personal rulebook management
-- Active/inactive rule toggling
-- Rule compliance tracking
-- Discipline reinforcement
-
-### ⚙️ **Settings & Data Management**
-- **Local Save/Load**: Quick save to this device
-- **File Export/Import**: Transfer data between devices
-- **Auto-Save**: Automatic backup every 5 minutes
-- **Theme Toggle**: Dark/Light mode support
-- **Custom Pairs & Strategies**: Personalize your setup
+- **📝 Trade Logging** - Complete CRUD with auto-calculated P/L and R:R ratios
+- **📊 Advanced Analytics** - 10+ interactive charts including Decision Quality Analytics
+- **🧠 Daily Reflection** - Mood tracking and trading psychology journaling
+- **📋 Rule Management** - Personal rulebook with compliance tracking
+- **⚙️ Multi-Market Support** - FOREX, Crypto, and Indian F&O (with strikes, expiry, option type)
+- **📈 Discipline Scoring** - Configurable analytics engine (Phase 6C)
+- **💾 Data Management** - Export/import, local save, auto-save every 5 minutes
+- **📱 PWA Support** - Install as app on mobile devices
 
 ---
 
 ## 🚀 Quick Start
 
-### Use Online (No Installation)
+### Online Access (No Installation)
+**Visit:** https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app
 
-**Simply visit:** https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app
+**Mobile:** Add to home screen for app-like experience (iOS/Android)
 
-**On Mobile:**
-1. Open the link in your browser
-2. **iOS**: Safari → Share → "Add to Home Screen"
-3. **Android**: Chrome → Menu → "Add to Home Screen"
-4. Works like a native app! 📱
-
-### Run Locally
+### Local Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/Aryan1438/Trading_Journal.git
+# Clone repository
+git clone https://github.com/Yash-109/Trading-Journal.git
+cd Trading-Journal
 
-# Navigate to project folder
-cd Trading_Journal
+# Install dependencies (frontend + backend)
+npm run install:all
 
-# Install dependencies
-npm install
+# Configure environment
+cd backend && cp .env.example .env
+cd ../frontend && echo "VITE_API_URL=http://localhost:5000/api" > .env
 
-# Start development server
-npm run dev
+# Run servers
+# Terminal 1 - Backend
+cd backend && npm run dev
+
+# Terminal 2 - Frontend
+cd frontend && npm run dev
 ```
 
-**Access locally at:** `http://localhost:3000`
+**See [SETUP.md](SETUP.md) for complete installation instructions**
 
 ---
 
-## 💾 Data Sync Workflow
+## 🏗️ Architecture
 
-### Transfer Data Between Devices:
+### Full-Stack Application
 
-1. **On Laptop:**
-   - Go to Settings
-   - Click "Download Backup File (JSON)"
-   - Save file to cloud/email/USB
+```
+Frontend (React + Vite)
+    ↓ REST API
+Backend (Node.js + Express)
+    ↓
+MongoDB Database
+```
 
-2. **On Phone:**
-   - Open app (using live link)
-   - Go to Settings
-   - Click "Upload Backup File"
-   - Select downloaded file
-   - ✅ Data synced!
+**Frontend:** React 18, Vite, Tailwind CSS, Recharts, Framer Motion  
+**Backend:** Express, Mongoose, JWT Authentication, bcrypt  
+**Database:** MongoDB with Mongoose ODM
 
-### Auto-Features:
-- ⏰ Auto-save every 5 minutes
-- 💾 Local save button always available
-- ⚠️ Warning banner for unsaved data
-- 🔄 Online/Offline status indicator
+**See [ARCHITECTURE.md](ARCHITECTURE.md) for technical details**
+
+---
+
+## 📊 Decision Quality Analytics (Phase 6C)
+
+### Three-Layer Architecture
+
+**Layer 1: Metrics Layer** - Pure facts (rule follow rate, trade quality, emotion stability)  
+**Layer 2: Configuration Layer** - Centralized weights and thresholds  
+**Layer 3: Rule Engine** - Computes discipline score (0-100)
+
+**Configurable:** Change weights without touching code
+
+```javascript
+// Modify weights in one place
+weights: {
+  ruleFollow: 0.35,
+  tradeQuality: 0.30,
+  emotionStability: 0.20,
+  winRate: 0.15
+}
+```
+
+**Analytics Include:**
+- Overall Discipline Score (Good/Average/Poor)
+- Rule-followed vs rule-broken performance
+- Trade quality buckets (1-3, 4-6, 7-10)
+- Emotion-wise performance analysis
+
+---
+
+## 🛠️ Tech Stack
+
+| Category | Technologies |
+|----------|-------------|
+| **Frontend** | React 18, Vite, React Router v6, Tailwind CSS |
+| **UI/UX** | Framer Motion, Lucide Icons, React Hot Toast |
+| **Charts** | Recharts |
+| **Backend** | Node.js, Express.js, Mongoose |
+| **Database** | MongoDB (local or Atlas) |
+| **Auth** | JWT, bcrypt |
+| **Deployment** | Vercel (frontend), Railway/Render (backend) |
+
+---
+
+## 📁 Project Structure
+
+```
+TradingJournal/
+├── frontend/
+│   ├── src/
+│   │   ├── components/      # UI components
+│   │   ├── context/         # State management
+│   │   ├── pages/           # Page components
+│   │   ├── services/        # API integration
+│   │   └── utils/           # Decision quality analytics
+│   └── package.json
+├── backend/
+│   ├── src/
+│   │   ├── models/          # MongoDB schemas
+│   │   ├── routes/          # API endpoints
+│   │   ├── controllers/     # Request handlers
+│   │   ├── middleware/      # Auth & validation
+│   │   └── server.js
+│   └── package.json
+└── Documentation/
+    ├── README.md            # This file
+    ├── SETUP.md             # Installation guide
+    ├── DEPLOYMENT.md        # Deployment instructions
+    └── ARCHITECTURE.md      # Technical architecture
+```
+
+---
+
+## 🎯 Use Cases
+
+- **Day Traders** - Track intraday performance across sessions
+- **Swing Traders** - Analyze multi-day trades and patterns
+- **Forex Traders** - Monitor currency pairs and correlations
+- **Crypto Traders** - Track volatile crypto markets
+- **Indian F&O** - Options and futures with strikes, expiry tracking
+- **Psychology Focus** - Understand emotional patterns
+- **Discipline Building** - Enforce personal trading rules
+
+---
+
+## 💾 Data Management
+
+### Full-Stack Version (With Backend)
+- Automatic cloud sync via MongoDB
+- Login from any device
+- No manual export/import needed
+
+### Frontend-Only Version
+- Local browser storage (IndexedDB)
+- Manual export/import (JSON files)
+- Auto-save every 5 minutes
+- Cross-device transfer via backup files
 
 ---
 
@@ -124,162 +178,39 @@ npm run dev
 
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl/Cmd + S` | Save data locally |
-| `Alt + 1` | Go to Dashboard |
-| `Alt + 2` | Go to Journal |
-| `Alt + 3` | Go to Analytics |
-| `Alt + 4` | Go to Reflection |
-| `Alt + 5` | Go to Rules |
-| `Alt + 6` | Go to Settings |
-| `Ctrl/Cmd + /` | Show shortcuts help |
-
----
-
-## 🛠️ Tech Stack
-
-- **Frontend:** React 18.2 + Vite
-- **Styling:** Tailwind CSS (Custom dark theme)
-- **Routing:** React Router v6
-- **Animation:** Framer Motion
-- **Charts:** Recharts + Chart.js
-- **Storage:** IndexedDB (idb) + LocalStorage
-- **Icons:** Lucide React
-- **Notifications:** React Hot Toast
-- **Export:** jsPDF
-- **Deployment:** Vercel
-- **Version Control:** Git + GitHub
-
----
-
-## 📂 Project Structure
-
-```
-Trading_Journal/
-├── src/
-│   ├── components/
-│   │   ├── Navbar.jsx              # Navigation bar
-│   │   ├── StatCard.jsx            # Statistic cards
-│   │   ├── TradeModal.jsx          # Trade entry form
-│   │   ├── DataSyncBanner.jsx      # Data warning banner
-│   │   └── KeyboardShortcuts.jsx   # Keyboard shortcuts
-│   ├── pages/
-│   │   ├── Dashboard.jsx           # Main dashboard
-│   │   ├── Journal.jsx             # Trade logging
-│   │   ├── Analytics.jsx           # Performance charts
-│   │   ├── Reflection.jsx          # Daily journaling
-│   │   ├── Rules.jsx               # Trading rules
-│   │   └── Settings.jsx            # Configuration
-│   ├── context/
-│   │   └── AppContext.jsx          # Global state + DB
-│   ├── App.jsx                     # Main app component
-│   ├── main.jsx                    # React entry point
-│   └── index.css                   # Global styles
-├── public/
-│   └── manifest.json               # PWA manifest
-├── DEPLOYMENT.md                   # Deploy guide
-├── QUICK_START.md                  # Getting started
-├── UI_DESIGN.md                    # Design system
-├── vercel.json                     # Vercel config
-└── package.json                    # Dependencies
-```
-
----
-
-## 🎨 Design System
-
-**Color Palette:**
-- Primary: Gold (#f59e0b)
-- Background: Charcoal (#0f0f0f, #1a1a1a)
-- Text: White (#ffffff) / Gray (#9ca3af)
-- Success: Green (#10b981)
-- Danger: Red (#ef4444)
-- Warning: Yellow (#f59e0b)
-
-**Typography:** Inter font family (Google Fonts)
-
-**Theme:** Dark mode optimized for reduced eye strain during long trading sessions
-
----
-
-## 📊 Features Status
-
-| Feature | Status | Description |
-|---------|--------|-------------|
-| Trade Logging | ✅ | Complete CRUD operations |
-| Analytics | ✅ | 6+ interactive charts |
-| Daily Reflection | ✅ | Mood tracking + journaling |
-| Rule Management | ✅ | Personal rulebook |
-| Data Export | ✅ | JSON backup files |
-| Data Import | ✅ | Restore from backup |
-| Local Save | ✅ | Quick device save |
-| Auto-Save | ✅ | Every 5 minutes |
-| Keyboard Shortcuts | ✅ | Navigation + actions |
-| PWA Support | ✅ | Add to home screen |
-| Dark/Light Theme | ✅ | Toggle in settings |
-| Mobile Responsive | ✅ | Optimized for all screens |
-| Offline Mode | ✅ | Works after first load |
-| Vercel Deployment | ✅ | Live production URL |
-| GitHub Repository | ✅ | Version controlled |
-
----
-
-## 🔐 Privacy & Security
-
-- ✅ **100% Local Storage**: All data stored in browser IndexedDB
-- ✅ **No Server Uploads**: No data sent to any external server
-- ✅ **No Authentication**: No passwords or login required
-- ✅ **Full Control**: You own your data completely
-- ✅ **Exportable**: Download all data anytime as JSON
-
----
-
-## 📈 Performance
-
-- **First Load:** ~2-3 seconds
-- **Subsequent Loads:** <1 second (cached)
-- **Offline Capability:** Yes (after first load)
-- **Storage Usage:** ~1-5MB for typical journal
-- **Mobile Data:** Minimal (~500KB initial load)
+| `Ctrl/Cmd + S` | Save data |
+| `Alt + 1-6` | Navigate pages |
+| `Ctrl/Cmd + /` | Show shortcuts |
 
 ---
 
 ## 🚀 Deployment
 
-This project is deployed on **Vercel** with automatic deployments from the `main` branch.
+**Frontend:** Vercel, Netlify, or GitHub Pages  
+**Backend:** Railway, Render, or Heroku  
+**Database:** MongoDB Atlas (free tier)
 
-### Deploy Your Own:
+**See [DEPLOYMENT.md](DEPLOYMENT.md) for step-by-step instructions**
 
-```bash
-# Install Vercel CLI
-npm install -g vercel
+---
 
-# Deploy
-vercel --prod
-```
+## 📚 Documentation
 
-Or click here: [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Aryan1438/Trading_Journal)
+- **[SETUP.md](SETUP.md)** - Installation and configuration
+- **[DEPLOYMENT.md](DEPLOYMENT.md)** - Production deployment guide
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Technical architecture and design patterns
 
 ---
 
 ## 🤝 Contributing
 
-Contributions, issues, and feature requests are welcome!
+Contributions welcome! Please follow these steps:
 
 1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
-
-## 📞 Support
-
-**Issues or Questions?**
-1. Check `DEPLOYMENT.md` for deployment help
-2. Open an issue on GitHub
-3. Check browser console for errors (F12)
-4. Verify dependencies: `npm list`
+2. Create feature branch (`git checkout -b feature/YourFeature`)
+3. Commit changes (`git commit -m 'Add YourFeature'`)
+4. Push to branch (`git push origin feature/YourFeature`)
+5. Open Pull Request
 
 ---
 
@@ -291,82 +222,20 @@ MIT License - Free to use and modify
 
 ## 🙏 Acknowledgments
 
-Built with ❤️ for traders who take their craft seriously.
+Built with ❤️ for traders who value discipline, data, and continuous improvement.
 
-**Special Features:**
-- Auto-save every 5 minutes
-- Keyboard shortcuts for power users
-- PWA support for mobile
-- Cross-device data transfer
-- Psychology tracking
-- Rule enforcement
+**Key Design Principles:**
+- **Configurable** - Change analytics rules without code changes
+- **Privacy-First** - Your data, your control
+- **Future-Proof** - Clean architecture for easy extensions
+- **User-Centric** - Designed by traders, for traders
 
 ---
 
-## 🎯 Roadmap
+## ⭐ Star This Project
 
-**Coming Soon:**
-- [ ] Cloud sync (optional)
-- [ ] Multi-currency support
-- [ ] Advanced reporting (PDF)
-- [ ] Trade screenshots upload
-- [ ] Performance benchmarking
-- [ ] Social sharing (anonymous)
-- [ ] Desktop app (Electron)
+If you find this useful, please star the repository!
 
 ---
 
-## 📸 Screenshots
-
-### Dashboard
-![Dashboard](https://via.placeholder.com/800x400/0f0f0f/f59e0b?text=Dashboard+View)
-
-### Trade Journal
-![Journal](https://via.placeholder.com/800x400/0f0f0f/f59e0b?text=Trade+Journal)
-
-### Analytics
-![Analytics](https://via.placeholder.com/800x400/0f0f0f/f59e0b?text=Analytics+Charts)
-
----
-
-## 📱 QR Code for Mobile Access
-
-Scan this QR code to open the app on your phone:
-
-```
-█████████████████████████████████
-█████████████████████████████████
-████ ▄▄▄▄▄ █▀█ █▄▄█▄█ ▄▄▄▄▄ ████
-████ █   █ █▀▀▀█ ▀ ▄█ █   █ ████
-████ █▄▄▄█ █▀ █▀▀█ ▀█ █▄▄▄█ ████
-████▄▄▄▄▄▄▄█▄▀ ▀▄█ █▄█▄▄▄▄▄▄████
-████ ▄▄ █▄▄ ▄▀▀▀▀▄ █▀▄ ▀▄▀ █████
-████▄▀▀█ ▀▄  ▄█▀ ▀ ▀▀▄▀▀▀▄▄█████
-████ ▀▄██▀▄█▀▀█  ▀▄▄ ▄▀▄ ▀▄▀████
-████ ▄▄▄▄▄ █ ██ ▄▀▀  ▀▄▀▄█▀█████
-████ █   █ █ ▄█▄▄▄▄██▀█▄▄▀▀█████
-████ █▄▄▄█ █ ▀ ▀ ▀▀▀ ▄▀ ▄▄▄█████
-████▄▄▄▄▄▄▄█▄▄███▄█▄▄█▄█▄▄██████
-█████████████████████████████████
-█████████████████████████████████
-```
-
-Or use this link: https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app
-
----
-
-**Made for traders, by a developer who understands the game. Trade smart. Trade disciplined. 🚀📊**
-
----
-
-## 🔗 Quick Links
-
-- **🚀 Live App:** [Open App](https://trade-journal-4z6fpd1ij-patelaryan2106-5559s-projects.vercel.app)
-- **📂 GitHub:** [View Code](https://github.com/Aryan1438/Trading_Journal)
-- **📖 Documentation:** [Getting Started](QUICK_START.md)
-- **🚀 Deploy Guide:** [Deployment](DEPLOYMENT.md)
-- **🎨 Design System:** [UI Design](UI_DESIGN.md)
-
----
-
-**⭐ Star this repo if you find it useful!**
+**Trade Smart. Trade Disciplined. Track Everything. 🚀📊**
