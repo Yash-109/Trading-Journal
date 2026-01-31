@@ -18,6 +18,18 @@ const tradeSchema = new mongoose.Schema(
       required: [true, 'Trading pair is required'],
       trim: true
     },
+    // Market type
+    market: {
+      type: String,
+      enum: ['FOREX', 'CRYPTO', 'INDIAN'],
+      default: 'FOREX'
+    },
+    // Instrument type (relevant for INDIAN market)
+    instrumentType: {
+      type: String,
+      enum: ['INDEX', 'FNO'],
+      required: false
+    },
     // Trade direction (Buy or Sell)
     direction: {
       type: String,

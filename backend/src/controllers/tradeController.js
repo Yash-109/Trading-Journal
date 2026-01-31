@@ -11,6 +11,8 @@ export const createTrade = async (req, res) => {
   try {
     const { 
       pair, 
+      market,
+      instrumentType,
       direction,
       entry, 
       stopLoss,
@@ -33,6 +35,8 @@ export const createTrade = async (req, res) => {
     const trade = await Trade.create({
       userId: req.user.userId,
       pair,
+      market,
+      instrumentType,
       direction,
       entry,
       stopLoss,
@@ -125,6 +129,8 @@ export const updateTrade = async (req, res) => {
   try {
     const { 
       pair, 
+      market,
+      instrumentType,
       direction,
       entry, 
       stopLoss,
@@ -150,6 +156,8 @@ export const updateTrade = async (req, res) => {
       },
       {
         pair,
+        market,
+        instrumentType,
         direction,
         entry,
         stopLoss,
