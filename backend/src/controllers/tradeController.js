@@ -19,6 +19,14 @@ export const createTrade = async (req, res) => {
       takeProfit,
       exit, 
       lotSize,
+      // Indian market fields
+      symbol,
+      quantity,
+      charges,
+      optionType,
+      strikePrice,
+      expiryDate,
+      // Common fields
       pnl, 
       rr,
       session,
@@ -43,6 +51,14 @@ export const createTrade = async (req, res) => {
       takeProfit,
       exit,
       lotSize,
+      // Indian market fields
+      symbol,
+      quantity,
+      charges,
+      optionType,
+      strikePrice,
+      expiryDate,
+      // Common fields
       pnl,
       rr,
       session,
@@ -137,6 +153,14 @@ export const updateTrade = async (req, res) => {
       takeProfit,
       exit, 
       lotSize,
+      // Indian market fields
+      symbol,
+      quantity,
+      charges,
+      optionType,
+      strikePrice,
+      expiryDate,
+      // Common fields
       pnl, 
       rr,
       session,
@@ -164,6 +188,14 @@ export const updateTrade = async (req, res) => {
         takeProfit,
         exit,
         lotSize,
+        // Indian market fields
+        symbol,
+        quantity,
+        charges,
+        optionType,
+        strikePrice,
+        expiryDate,
+        // Common fields
         pnl,
         rr,
         session,

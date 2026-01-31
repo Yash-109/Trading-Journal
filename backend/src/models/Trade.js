@@ -57,6 +57,33 @@ const tradeSchema = new mongoose.Schema(
     lotSize: {
       type: Number
     },
+    // === INDIAN MARKET FIELDS ===
+    // Stock/Index symbol (e.g., 'NIFTY', 'BANKNIFTY', 'RELIANCE')
+    symbol: {
+      type: String,
+      trim: true
+    },
+    // Quantity of shares/contracts
+    quantity: {
+      type: Number
+    },
+    // Trading charges (brokerage, taxes, etc.)
+    charges: {
+      type: Number
+    },
+    // Option type (CE - Call, PE - Put) for F&O trades
+    optionType: {
+      type: String,
+      enum: ['CE', 'PE']
+    },
+    // Strike price for F&O options
+    strikePrice: {
+      type: Number
+    },
+    // Expiry date for F&O contracts
+    expiryDate: {
+      type: Date
+    },
     // Profit/Loss amount
     pnl: {
       type: Number,
@@ -115,6 +142,69 @@ const tradeSchema = new mongoose.Schema(
     timestamps: true
   }
 );
+
+// Validation for Indian market trades
+tradeSchema.pre('save', function(next) {
+  // Only validate if market is INDIAN
+  if (this.market === 'INDIAN') {
+    // instrumentType is required for INDIAN market
+    if (!this.instrumentType) {
+      return next(new Error('instrumentType is required for INDIAN market trades'));
+    }
+    
+    // symbol is required for INDIAN market
+    if (!this.symbol) {
+      return next(new Error('symbol is required for INDIAN market trades'));
+    }
+    
+    // F&O specific validation
+    if (this.instrumentType === 'FNO') {
+      if (!this.optionType) {
+        return next(new Error('optionType (CE/PE) is required for F&O trades'));
+      }
+      if (!this.strikePrice) {
+        return next(new Error('strikePrice is required for F&O trades'));
+      }
+      if (!this.expiryDate) {
+        return next(new Error('expiryDate is required for F&O trades'));
+      }
+    }
+  }
+  next();
+});
+
+// Validation for updates
+tradeSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  const updateDoc = update.$set || update;
+  
+  // Only validate if market is being set to INDIAN or already is INDIAN
+  if (updateDoc.market === 'INDIAN') {
+    // instrumentType is required for INDIAN market
+    if (!updateDoc.instrumentType) {
+      return next(new Error('instrumentType is required for INDIAN market trades'));
+    }
+    
+    // symbol is required for INDIAN market
+    if (!updateDoc.symbol) {
+      return next(new Error('symbol is required for INDIAN market trades'));
+    }
+    
+    // F&O specific validation
+    if (updateDoc.instrumentType === 'FNO') {
+      if (!updateDoc.optionType) {
+        return next(new Error('optionType (CE/PE) is required for F&O trades'));
+      }
+      if (!updateDoc.strikePrice && updateDoc.strikePrice !== 0) {
+        return next(new Error('strikePrice is required for F&O trades'));
+      }
+      if (!updateDoc.expiryDate) {
+        return next(new Error('expiryDate is required for F&O trades'));
+      }
+    }
+  }
+  next();
+});
 
 const Trade = mongoose.model('Trade', tradeSchema);
 
