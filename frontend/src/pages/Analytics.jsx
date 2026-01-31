@@ -20,6 +20,7 @@ import {
 import { Download, TrendingUp, TrendingDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
+import { computeDecisionQualityAnalytics } from '../utils/decisionQualityAnalytics';
 
 const Analytics = () => {
   const { trades: rawTrades = [], settings } = useApp();
@@ -31,17 +32,63 @@ const Analytics = () => {
   const analytics = useMemo(() => {
     if (!normalizedTrades || normalizedTrades.length === 0) return null;
 
-    // By Pair
+    // Helper function to calculate stats for a subset of trades
+    const calculateStats = (trades) => {
+      if (!trades || trades.length === 0) {
+        return {
+          totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: 0,
+          totalPnl: 0,
+          avgPnl: 0,
+        };
+      }
+
+      const winningTrades = trades.filter(t => t.pnl > 0).length;
+      const losingTrades = trades.filter(t => t.pnl < 0).length;
+      const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+      return {
+        totalTrades: trades.length,
+        winningTrades,
+        losingTrades,
+        winRate: trades.length > 0 ? (winningTrades / trades.length) * 100 : 0,
+        totalPnl,
+        avgPnl: trades.length > 0 ? totalPnl / trades.length : 0,
+      };
+    };
+
+    // Separate trades by market
+    const forexTrades = normalizedTrades.filter(t => t.market === 'FOREX');
+    const cryptoTrades = normalizedTrades.filter(t => t.market === 'CRYPTO');
+    const indianTrades = normalizedTrades.filter(t => t.market === 'INDIAN');
+
+    // Further separate INDIAN trades by instrument type
+    const indianIndexTrades = indianTrades.filter(t => t.instrumentType === 'INDEX' || !t.instrumentType);
+    const indianFNOTrades = indianTrades.filter(t => t.instrumentType === 'FNO');
+
+    // Calculate stats for each market
+    const marketStats = {
+      FOREX: calculateStats(forexTrades),
+      CRYPTO: calculateStats(cryptoTrades),
+      INDIAN: calculateStats(indianTrades),
+      INDIAN_INDEX: calculateStats(indianIndexTrades),
+      INDIAN_FNO: calculateStats(indianFNOTrades),
+      OVERALL: calculateStats(normalizedTrades),
+    };
+
+    // By Pair/Symbol (market-aware: use displayPair from normalized trades)
     const byPair = {};
     normalizedTrades.forEach(trade => {
-      const pair = trade.pair || 'Unknown';
-      if (!byPair[pair]) {
-        byPair[pair] = { wins: 0, losses: 0, total: 0, pl: 0 };
+      const key = trade.displayPair || 'Unknown';
+      if (!byPair[key]) {
+        byPair[key] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
-      byPair[pair].total++;
-      byPair[pair].pl += trade.pnl;
-      if (trade.pnl > 0) byPair[pair].wins++;
-      else byPair[pair].losses++;
+      byPair[key].total++;
+      byPair[key].pl += trade.pnl;
+      if (trade.pnl > 0) byPair[key].wins++;
+      else byPair[key].losses++;
     });
 
     const pairData = Object.entries(byPair).map(([pair, data]) => ({
@@ -126,13 +173,100 @@ const Analytics = () => {
       { name: 'Breakeven', value: breakeven, color: '#6b7280' },
     ];
 
+    // Market Distribution Data
+    const marketData = [
+      { name: 'FOREX', value: marketStats.FOREX.totalTrades, color: '#3b82f6' },
+      { name: 'CRYPTO', value: marketStats.CRYPTO.totalTrades, color: '#f59e0b' },
+      { name: 'INDIAN', value: marketStats.INDIAN.totalTrades, color: '#8b5cf6' },
+    ].filter(m => m.value > 0);
+
+    // ============================================================================
+    // INDIAN F&O ANALYTICS
+    // ============================================================================
+
+    // B. Option Type Performance
+    const byOptionType = {};
+    indianFNOTrades.forEach(trade => {
+      const optionType = trade.optionType || 'Unknown';
+      if (!byOptionType[optionType]) {
+        byOptionType[optionType] = { count: 0, wins: 0, pl: 0 };
+      }
+      byOptionType[optionType].count++;
+      byOptionType[optionType].pl += trade.pnl || 0;
+      if (trade.pnl > 0) byOptionType[optionType].wins++;
+    });
+
+    const optionTypeData = Object.entries(byOptionType).map(([optionType, data]) => ({
+      optionType,
+      count: data.count,
+      winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+      pl: data.pl,
+    }));
+
+    // C. Strike Price Performance
+    const byStrikePrice = {};
+    indianFNOTrades.forEach(trade => {
+      const strikePrice = trade.strikePrice || 0;
+      const key = strikePrice.toString();
+      if (!byStrikePrice[key]) {
+        byStrikePrice[key] = { count: 0, pl: 0 };
+      }
+      byStrikePrice[key].count++;
+      byStrikePrice[key].pl += trade.pnl || 0;
+    });
+
+    const strikePriceData = Object.entries(byStrikePrice)
+      .map(([strikePrice, data]) => ({
+        strikePrice: parseFloat(strikePrice),
+        count: data.count,
+        pl: data.pl,
+      }))
+      .sort((a, b) => a.strikePrice - b.strikePrice);
+
+    // D. Expiry Date Performance
+    const byExpiryDate = {};
+    indianFNOTrades.forEach(trade => {
+      const expiryDate = trade.expiryDate || 'Unknown';
+      if (!byExpiryDate[expiryDate]) {
+        byExpiryDate[expiryDate] = { count: 0, wins: 0, pl: 0 };
+      }
+      byExpiryDate[expiryDate].count++;
+      byExpiryDate[expiryDate].pl += trade.pnl || 0;
+      if (trade.pnl > 0) byExpiryDate[expiryDate].wins++;
+    });
+
+    const expiryDateData = Object.entries(byExpiryDate)
+      .map(([expiryDate, data]) => ({
+        expiryDate,
+        count: data.count,
+        winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+        pl: data.pl,
+      }))
+      .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+    // ============================================================================
+
+    // ============================================================================
+    // DECISION QUALITY ANALYTICS (Phase 6C)
+    // ============================================================================
+    const decisionQualityAnalytics = computeDecisionQualityAnalytics(normalizedTrades);
+
     return {
+      marketStats,
+      marketData,
       pairData,
       emotionData,
       sessionData,
       strategyData,
       rulesData,
       winLossData,
+      // F&O Analytics
+      optionTypeData,
+      strikePriceData,
+      expiryDateData,
+      hasFNOTrades: indianFNOTrades.length > 0,
+      // Decision Quality Analytics
+      decisionQuality: decisionQualityAnalytics,
     };
   }, [normalizedTrades]);
 
@@ -286,6 +420,313 @@ const Analytics = () => {
           </ResponsiveContainer>
         </motion.div>
       </div>
+
+      {/* ============================================================================ */}
+      {/* DECISION QUALITY ANALYTICS (Phase 6C) */}
+      {/* ============================================================================ */}
+      
+      {/* Discipline Score Card */}
+      {analytics.decisionQuality && (
+        <>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            className="bg-gradient-to-br from-dark-card to-dark-bg border border-dark-border rounded-xl p-6"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-white">Overall Discipline Score</h3>
+              <span className={`px-4 py-2 rounded-lg font-bold text-lg ${
+                analytics.decisionQuality.disciplineLabel === 'Good' ? 'bg-profit/20 text-profit' :
+                analytics.decisionQuality.disciplineLabel === 'Average' ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-loss/20 text-loss'
+              }`}>
+                {analytics.decisionQuality.disciplineLabel}
+              </span>
+            </div>
+            
+            <div className="flex items-center justify-center mb-6">
+              <div className="relative">
+                <svg className="w-48 h-48 transform -rotate-90">
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r="88"
+                    stroke="#2d3748"
+                    strokeWidth="12"
+                    fill="none"
+                  />
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r="88"
+                    stroke={
+                      analytics.decisionQuality.disciplineLabel === 'Good' ? '#10b981' :
+                      analytics.decisionQuality.disciplineLabel === 'Average' ? '#f59e0b' :
+                      '#ef4444'
+                    }
+                    strokeWidth="12"
+                    fill="none"
+                    strokeDasharray={`${2 * Math.PI * 88}`}
+                    strokeDashoffset={`${2 * Math.PI * 88 * (1 - analytics.decisionQuality.disciplineScore / 100)}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-5xl font-bold text-white">
+                    {analytics.decisionQuality.disciplineScore}
+                  </span>
+                  <span className="text-gray-400 text-sm">out of 100</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Score Breakdown */}
+            <div className="space-y-3">
+              <h4 className="text-sm font-semibold text-gray-400 uppercase mb-4">Score Breakdown</h4>
+              
+              {Object.entries(analytics.decisionQuality.disciplineBreakdown).map(([key, data]) => (
+                <div key={key} className="space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-300 capitalize">
+                      {key === 'ruleFollow' ? 'Rule Compliance' :
+                       key === 'tradeQuality' ? 'Trade Quality' :
+                       key === 'emotionStability' ? 'Emotion Stability' :
+                       key === 'winRate' ? 'Win Rate' : key}
+                    </span>
+                    <span className="text-white font-semibold">
+                      {data.value.toFixed(1)}% × {(data.weight * 100).toFixed(0)}% = {data.weighted.toFixed(1)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-dark-border rounded-full h-2">
+                    <div
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all"
+                      style={{ width: `${data.value}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 p-4 bg-dark-bg rounded-lg border border-dark-border">
+              <p className="text-xs text-gray-400 leading-relaxed">
+                <strong className="text-gray-300">How it's calculated:</strong> This score combines multiple factors with configurable weights. 
+                Rule compliance ({(analytics.decisionQuality.config.weights.ruleFollow * 100).toFixed(0)}%), 
+                trade quality ({(analytics.decisionQuality.config.weights.tradeQuality * 100).toFixed(0)}%), 
+                emotion stability ({(analytics.decisionQuality.config.weights.emotionStability * 100).toFixed(0)}%), 
+                and win rate ({(analytics.decisionQuality.config.weights.winRate * 100).toFixed(0)}%). 
+                Weights can be adjusted in the config file.
+              </p>
+            </div>
+          </motion.div>
+
+          {/* Rule Followed vs Broken Performance */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="bg-dark-card border border-dark-border rounded-xl p-6"
+          >
+            <h3 className="text-xl font-semibold text-white mb-6">Rule-Followed vs Rule-Broken Performance</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Rules Followed */}
+              <div className="bg-dark-bg rounded-lg p-4 border border-profit/30">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-3 h-3 rounded-full bg-profit"></div>
+                  <h4 className="text-lg font-semibold text-white">Rules Followed</h4>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total Trades:</span>
+                    <span className="text-white font-semibold">{analytics.decisionQuality.ruleComparison.ruleFollowed.trades}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Win Rate:</span>
+                    <span className="text-profit font-semibold">
+                      {analytics.decisionQuality.ruleComparison.ruleFollowed.winRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Avg P/L:</span>
+                    <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total P/L:</span>
+                    <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Rules Broken */}
+              <div className="bg-dark-bg rounded-lg p-4 border border-loss/30">
+                <div className="flex items-center space-x-2 mb-4">
+                  <div className="w-3 h-3 rounded-full bg-loss"></div>
+                  <h4 className="text-lg font-semibold text-white">Rules Broken</h4>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total Trades:</span>
+                    <span className="text-white font-semibold">{analytics.decisionQuality.ruleComparison.ruleBroken.trades}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Win Rate:</span>
+                    <span className="text-loss font-semibold">
+                      {analytics.decisionQuality.ruleComparison.ruleBroken.winRate.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Avg P/L:</span>
+                    <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Total P/L:</span>
+                    <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Trade Quality Buckets Performance */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.25 }}
+            className="bg-dark-card border border-dark-border rounded-xl p-6"
+          >
+            <h3 className="text-xl font-semibold text-white mb-6">Performance by Trade Quality Rating</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Poor Quality (1-3) */}
+              <div className="bg-dark-bg rounded-lg p-4 border border-loss/30">
+                <h4 className="text-lg font-semibold text-loss mb-3">Poor (1-3)</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Trades:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.poor.trades}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Win Rate:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.poor.winRate.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Avg P/L:</span>
+                    <span className={analytics.decisionQuality.qualityBuckets.poor.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
+                      {analytics.decisionQuality.qualityBuckets.poor.avgPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.qualityBuckets.poor.avgPnl.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Average Quality (4-6) */}
+              <div className="bg-dark-bg rounded-lg p-4 border border-yellow-500/30">
+                <h4 className="text-lg font-semibold text-yellow-400 mb-3">Average (4-6)</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Trades:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.average.trades}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Win Rate:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.average.winRate.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Avg P/L:</span>
+                    <span className={analytics.decisionQuality.qualityBuckets.average.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
+                      {analytics.decisionQuality.qualityBuckets.average.avgPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.qualityBuckets.average.avgPnl.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Good Quality (7-10) */}
+              <div className="bg-dark-bg rounded-lg p-4 border border-profit/30">
+                <h4 className="text-lg font-semibold text-profit mb-3">Good (7-10)</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Trades:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.good.trades}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Win Rate:</span>
+                    <span className="text-white">{analytics.decisionQuality.qualityBuckets.good.winRate.toFixed(1)}%</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">Avg P/L:</span>
+                    <span className={analytics.decisionQuality.qualityBuckets.good.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
+                      {analytics.decisionQuality.qualityBuckets.good.avgPnl >= 0 ? '+' : ''}
+                      {analytics.decisionQuality.qualityBuckets.good.avgPnl.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Emotion-wise Performance */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="bg-dark-card border border-dark-border rounded-xl p-6"
+          >
+            <h3 className="text-xl font-semibold text-white mb-6">Performance by Emotional State</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-dark-border">
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Emotion</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Trades</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Win Rate</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Avg P/L</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-medium">Total P/L</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {analytics.decisionQuality.emotionPerformance.map((emotion, index) => (
+                    <tr key={index} className="border-b border-dark-border/50">
+                      <td className="py-3 px-4 text-white font-semibold">{emotion.emotion}</td>
+                      <td className="py-3 px-4 text-gray-300">{emotion.trades}</td>
+                      <td className="py-3 px-4">
+                        <span className={emotion.winRate >= 50 ? 'text-profit' : 'text-loss'}>
+                          {emotion.winRate.toFixed(1)}%
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`font-semibold ${emotion.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {emotion.avgPnl >= 0 ? '+' : ''}{emotion.avgPnl.toFixed(2)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <span className={`font-bold ${emotion.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {emotion.totalPnl >= 0 ? '+' : ''}{emotion.totalPnl.toFixed(2)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </motion.div>
+        </>
+      )}
+
+      {/* ============================================================================ */}
+      {/* END OF DECISION QUALITY ANALYTICS */}
+      {/* ============================================================================ */}
 
       {/* Performance by Pair */}
       <motion.div
@@ -447,6 +888,137 @@ const Analytics = () => {
                       </td>
                     </tr>
                   ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ============================================================================ */}
+      {/* INDIAN F&O ANALYTICS SECTION */}
+      {/* ============================================================================ */}
+
+      {/* F&O Option Type Performance */}
+      {analytics.hasFNOTrades && analytics.optionTypeData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Option Type Performance</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {analytics.optionTypeData.map((option, index) => (
+              <div
+                key={option.optionType}
+                className="bg-dark-bg border border-dark-border rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-white">{option.optionType}</h4>
+                  <span className="text-sm text-gray-400">{option.count} trades</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Win Rate</span>
+                    <span className={(option.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                      {Number(option.winRate || 0).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">P/L</span>
+                    <span className={(option.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                      {(option.pl || 0) >= 0 ? '+' : ''}{Number(option.pl || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* F&O Strike Price Performance */}
+      {analytics.hasFNOTrades && analytics.strikePriceData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Strike Price Performance</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-border">
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Strike Price</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Trades</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">P/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.strikePriceData
+                  .sort((a, b) => (b.pl || 0) - (a.pl || 0))
+                  .map((strike, index) => (
+                    <tr key={index} className="border-b border-dark-border/50">
+                      <td className="py-3 px-4 text-white font-semibold">
+                        {Number(strike.strikePrice).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">{strike.count}</td>
+                      <td className="py-3 px-4">
+                        <span className={`font-semibold ${(strike.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {(strike.pl || 0) >= 0 ? '+' : ''}{Number(strike.pl || 0).toFixed(2)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
+
+      {/* F&O Expiry Date Performance */}
+      {analytics.hasFNOTrades && analytics.expiryDateData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Expiry Date Performance</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-border">
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Expiry Date</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Trades</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Win Rate</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">P/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.expiryDateData.map((expiry, index) => (
+                  <tr key={index} className="border-b border-dark-border/50">
+                    <td className="py-3 px-4 text-white font-semibold">
+                      {new Date(expiry.expiryDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">{expiry.count}</td>
+                    <td className="py-3 px-4">
+                      <span className={(expiry.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                        {Number(expiry.winRate || 0).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`font-semibold ${(expiry.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {(expiry.pl || 0) >= 0 ? '+' : ''}{Number(expiry.pl || 0).toFixed(2)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
