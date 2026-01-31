@@ -92,6 +92,9 @@ export const normalizeTrade = (trade) => {
   const isBreakeven = pnl === 0 && exit > 0; // Has exit price but no P/L
   const isOpen = exit === 0; // No exit price yet
 
+  // Normalize display field: INDIAN trades use symbol, others use pair
+  const displayPair = trade.market === 'INDIAN' ? (trade.symbol || '') : (trade.pair || '');
+
   return {
     ...trade,
     // Normalized numeric fields
@@ -108,6 +111,8 @@ export const normalizeTrade = (trade) => {
     isLoss,
     isBreakeven,
     isOpen,
+    // Display field for UI
+    displayPair,
   };
 };
 

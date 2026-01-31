@@ -39,11 +39,11 @@ const Journal = () => {
     
     return normalizedTrades.filter(trade => {
       const matchesSearch = 
-        (trade.pair || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trade.displayPair || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (trade.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (trade.strategy || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-      const matchesPair = !filters.pair || trade.pair === filters.pair;
+      const matchesPair = !filters.pair || trade.displayPair === filters.pair;
       const matchesDirection = !filters.direction || trade.direction === filters.direction;
       const matchesEmotion = !filters.emotion || trade.emotion === filters.emotion;
       const matchesStrategy = !filters.strategy || trade.strategy === filters.strategy;
@@ -93,7 +93,7 @@ const Journal = () => {
   };
 
   // Get unique values for filters from normalized trades
-  const uniquePairs = [...new Set((normalizedTrades || []).map(t => t.pair).filter(Boolean))];
+  const uniquePairs = [...new Set((normalizedTrades || []).map(t => t.displayPair).filter(Boolean))];
   const uniqueStrategies = [...new Set((normalizedTrades || []).map(t => t.strategy).filter(Boolean))];
   const emotions = ['Calm', 'Fear', 'Greed', 'Hesitant', 'Overconfident', 'Revenge'];
 
@@ -242,7 +242,7 @@ const Journal = () => {
                   <div className={`w-2 h-16 rounded ${trade.pnl >= 0 ? 'bg-profit' : 'bg-loss'}`} />
                   <div>
                     <div className="flex items-center space-x-3 mb-2">
-                      <h3 className="text-xl font-bold text-white">{trade.pair}</h3>
+                      <h3 className="text-xl font-bold text-white">{trade.displayPair}</h3>
                       <span className={`px-3 py-1 rounded-lg text-sm font-semibold ${
                         trade.direction === 'Buy' 
                           ? 'bg-green-500/20 text-green-400' 
