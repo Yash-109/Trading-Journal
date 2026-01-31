@@ -15,7 +15,6 @@ const tradeSchema = new mongoose.Schema(
     // Trading pair (e.g., 'BTC/USD', 'EUR/USD', 'XAUUSD')
     pair: {
       type: String,
-      required: [true, 'Trading pair is required'],
       trim: true
     },
     // Market type
@@ -145,6 +144,11 @@ const tradeSchema = new mongoose.Schema(
 
 // Validation for Indian market trades
 tradeSchema.pre('save', function(next) {
+  // Validate FOREX/CRYPTO markets require pair
+  if (this.market !== 'INDIAN' && !this.pair) {
+    return next(new Error('Trading pair is required for FOREX and CRYPTO trades'));
+  }
+  
   // Only validate if market is INDIAN
   if (this.market === 'INDIAN') {
     // instrumentType is required for INDIAN market
@@ -177,6 +181,11 @@ tradeSchema.pre('save', function(next) {
 tradeSchema.pre('findOneAndUpdate', function(next) {
   const update = this.getUpdate();
   const updateDoc = update.$set || update;
+  
+  // Validate FOREX/CRYPTO markets require pair
+  if (updateDoc.market && updateDoc.market !== 'INDIAN' && !updateDoc.pair) {
+    return next(new Error('Trading pair is required for FOREX and CRYPTO trades'));
+  }
   
   // Only validate if market is being set to INDIAN or already is INDIAN
   if (updateDoc.market === 'INDIAN') {

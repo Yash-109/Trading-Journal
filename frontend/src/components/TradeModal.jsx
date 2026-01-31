@@ -6,17 +6,26 @@ import { useApp } from '../context/AppContext';
 
 const TradeModal = ({ isOpen, onClose, trade = null }) => {
   const { addTrade, updateTrade, settings } = useApp();
-  
+
   const [formData, setFormData] = useState({
     id: '',
     date: new Date().toISOString().split('T')[0],
     pair: '',
+    market: 'FOREX',
+    instrumentType: '',
     direction: 'Buy',
     entry: '',
     stopLoss: '',
     takeProfit: '',
     exit: '',
     lotSize: '',
+    // Indian market fields
+    symbol: '',
+    quantity: '',
+    charges: '',
+    optionType: '',
+    strikePrice: '',
+    expiryDate: '',
     profitLoss: 0,
     rr: 0,
     session: 'London',
@@ -36,12 +45,21 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         id: uuidv4(),
         date: new Date().toISOString().split('T')[0],
         pair: '',
+        market: 'FOREX',
+        instrumentType: '',
         direction: 'Buy',
         entry: '',
         stopLoss: '',
         takeProfit: '',
         exit: '',
         lotSize: '',
+        // Indian market fields
+        symbol: '',
+        quantity: '',
+        charges: '',
+        optionType: '',
+        strikePrice: '',
+        expiryDate: '',
         profitLoss: 0,
         rr: 0,
         session: 'London',
@@ -102,15 +120,85 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!formData.pair || !formData.entry || !formData.exit) {
-      alert('Please fill in required fields: Pair, Entry, and Exit');
-      return;
+    // Market-aware validation
+    if (formData.market === 'INDIAN') {
+      if (!formData.symbol || !formData.entry || !formData.exit) {
+        alert('Please fill in required fields: Symbol, Entry, and Exit');
+        return;
+      }
+      
+      if (formData.instrumentType === 'FNO') {
+        if (!formData.optionType || !formData.strikePrice || !formData.expiryDate) {
+          alert('Please fill in required F&O fields: Option Type, Strike Price, and Expiry Date');
+          return;
+        }
+      }
+    } else {
+      // FOREX/CRYPTO validation
+      if (!formData.pair || !formData.entry || !formData.exit) {
+        alert('Please fill in required fields: Pair, Entry, and Exit');
+        return;
+      }
+    }
+
+    // Normalize payload based on market type
+    let payload;
+    
+    if (formData.market === 'INDIAN') {
+      // Indian market payload
+      payload = {
+        id: formData.id,
+        market: formData.market,
+        instrumentType: formData.instrumentType,
+        symbol: formData.symbol,
+        direction: formData.direction,
+        entry: formData.entry,
+        exit: formData.exit,
+        quantity: formData.quantity,
+        charges: formData.charges,
+        date: formData.date,
+        strategy: formData.strategy,
+        ruleFollowed: formData.ruleFollowed,
+        emotion: formData.emotion,
+        tradeQuality: formData.tradeQuality,
+        notes: formData.notes,
+      };
+      
+      // Add F&O specific fields
+      if (formData.instrumentType === 'FNO') {
+        payload.optionType = formData.optionType;
+        payload.strikePrice = formData.strikePrice;
+        payload.expiryDate = formData.expiryDate;
+      }
+    } else {
+      // FOREX/CRYPTO payload (preserve existing behavior)
+      payload = {
+        id: formData.id,
+        market: formData.market,
+        pair: formData.pair,
+        direction: formData.direction,
+        entry: formData.entry,
+        stopLoss: formData.stopLoss,
+        takeProfit: formData.takeProfit,
+        exit: formData.exit,
+        lotSize: formData.lotSize,
+        profitLoss: formData.profitLoss,
+        rr: formData.rr,
+        session: formData.session,
+        strategy: formData.strategy,
+        ruleFollowed: formData.ruleFollowed,
+        emotion: formData.emotion,
+        tradeQuality: formData.tradeQuality,
+        screenshot: formData.screenshot,
+        notes: formData.notes,
+        date: formData.date,
+      };
     }
 
     if (trade) {
-      await updateTrade(formData);
+      await updateTrade(payload);
     } else {
-      await addTrade(formData);
+      await addTrade(payload);
     }
     onClose();
   };
@@ -151,6 +239,39 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {/* Market */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Market *</label>
+                  <select
+                    name="market"
+                    value={formData.market}
+                    onChange={handleChange}
+                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                  >
+                    <option value="FOREX">FOREX</option>
+                    <option value="CRYPTO">CRYPTO</option>
+                    <option value="INDIAN">INDIAN</option>
+                  </select>
+                </div>
+
+                {/* Instrument Type (INDIAN only) */}
+                {formData.market === 'INDIAN' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Instrument Type *</label>
+                    <select
+                      name="instrumentType"
+                      value={formData.instrumentType}
+                      onChange={handleChange}
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      <option value="INDEX">INDEX</option>
+                      <option value="FNO">F&O</option>
+                    </select>
+                  </div>
+                )}
+
                 {/* Date */}
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">Date *</label>
@@ -164,25 +285,40 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                   />
                 </div>
 
-                {/* Pair */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Pair *</label>
-                  <input
-                    type="text"
-                    name="pair"
-                    value={formData.pair}
-                    onChange={handleChange}
-                    list="pairs-list"
-                    placeholder="e.g., XAUUSD"
-                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                    required
-                  />
-                  <datalist id="pairs-list">
-                    {settings.pairs.map(pair => (
-                      <option key={pair} value={pair} />
-                    ))}
-                  </datalist>
-                </div>
+                {/* Pair (FOREX/CRYPTO) or Symbol (INDIAN) */}
+                {formData.market === 'INDIAN' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Symbol *</label>
+                    <input
+                      type="text"
+                      name="symbol"
+                      value={formData.symbol}
+                      onChange={handleChange}
+                      placeholder="e.g., NIFTY, BANKNIFTY"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Pair *</label>
+                    <input
+                      type="text"
+                      name="pair"
+                      value={formData.pair}
+                      onChange={handleChange}
+                      list="pairs-list"
+                      placeholder="e.g., XAUUSD"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    />
+                    <datalist id="pairs-list">
+                      {settings.pairs.map(pair => (
+                        <option key={pair} value={pair} />
+                      ))}
+                    </datalist>
+                  </div>
+                )}
 
                 {/* Direction */}
                 <div>
@@ -197,6 +333,56 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                     <option value="Sell">Sell</option>
                   </select>
                 </div>
+
+                {/* Option Type (F&O only) */}
+                {formData.market === 'INDIAN' && formData.instrumentType === 'FNO' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Option Type *</label>
+                    <select
+                      name="optionType"
+                      value={formData.optionType}
+                      onChange={handleChange}
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      <option value="CE">CE (Call)</option>
+                      <option value="PE">PE (Put)</option>
+                    </select>
+                  </div>
+                )}
+
+                {/* Strike Price (F&O only) */}
+                {formData.market === 'INDIAN' && formData.instrumentType === 'FNO' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Strike Price *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="strikePrice"
+                      value={formData.strikePrice}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                )}
+
+                {/* Expiry Date (F&O only) */}
+                {formData.market === 'INDIAN' && formData.instrumentType === 'FNO' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Expiry Date *</label>
+                    <input
+                      type="date"
+                      name="expiryDate"
+                      value={formData.expiryDate}
+                      onChange={handleChange}
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+                )}
 
                 {/* Entry */}
                 <div>
@@ -256,19 +442,50 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                   />
                 </div>
 
-                {/* Lot Size */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Lot Size</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    name="lotSize"
-                    value={formData.lotSize}
-                    onChange={handleChange}
-                    placeholder="0.01"
-                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                  />
-                </div>
+                {/* Lot Size (FOREX/CRYPTO) or Quantity (INDIAN) */}
+                {formData.market === 'INDIAN' ? (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Quantity</label>
+                    <input
+                      type="number"
+                      step="1"
+                      name="quantity"
+                      value={formData.quantity}
+                      onChange={handleChange}
+                      placeholder="0"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Lot Size</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="lotSize"
+                      value={formData.lotSize}
+                      onChange={handleChange}
+                      placeholder="0.01"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
+
+                {/* Charges (INDIAN only) */}
+                {formData.market === 'INDIAN' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Charges</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      name="charges"
+                      value={formData.charges}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                    />
+                  </div>
+                )}
 
                 {/* Session */}
                 <div>
