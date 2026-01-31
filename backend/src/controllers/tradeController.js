@@ -34,7 +34,6 @@ export const createTrade = async (req, res) => {
       ruleFollowed,
       emotion,
       tradeQuality,
-      screenshot,
       notes, 
       date 
     } = req.body;
@@ -110,7 +109,6 @@ export const createTrade = async (req, res) => {
       ruleFollowed,
       emotion,
       tradeQuality,
-      screenshot,
       notes,
       date
     });
@@ -212,7 +210,6 @@ export const updateTrade = async (req, res) => {
       ruleFollowed,
       emotion,
       tradeQuality,
-      screenshot,
       notes, 
       date 
     } = req.body;
@@ -291,7 +288,6 @@ export const updateTrade = async (req, res) => {
         ruleFollowed,
         emotion,
         tradeQuality,
-        screenshot,
         notes,
         date
       },

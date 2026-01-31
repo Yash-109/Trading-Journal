@@ -122,10 +122,6 @@ const tradeSchema = new mongoose.Schema(
       max: 10,
       default: 5
     },
-    // Screenshot URL or path
-    screenshot: {
-      type: String
-    },
     // Trade notes
     notes: {
       type: String,

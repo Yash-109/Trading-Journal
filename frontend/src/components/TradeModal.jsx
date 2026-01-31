@@ -33,7 +33,6 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
     ruleFollowed: true,
     emotion: 'Calm',
     tradeQuality: 5,
-    screenshot: '',
     notes: '',
   });
 
@@ -67,7 +66,6 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         ruleFollowed: true,
         emotion: 'Calm',
         tradeQuality: 5,
-        screenshot: '',
         notes: '',
       });
     }
@@ -208,7 +206,6 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         ruleFollowed: formData.ruleFollowed,
         emotion: formData.emotion,
         tradeQuality: formData.tradeQuality,
-        screenshot: formData.screenshot,
         notes: formData.notes,
         date: formData.date,
       };
@@ -272,7 +269,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                     <option value="INDIAN">INDIAN</option>
                   </select>
                 </div>
-                  
+
                 {/* Instrument Type (INDIAN only) */}
                 {formData.market === 'INDIAN' && (
                   <div>
