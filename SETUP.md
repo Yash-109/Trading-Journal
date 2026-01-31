@@ -70,7 +70,7 @@ npm install
    # Database Configuration
    MONGODB_URI=mongodb://localhost:27017/trading_journal
    # Or use MongoDB Atlas:
-   # MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/trading_journal
+   # MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/trading_journal
    
    # JWT Configuration
    JWT_SECRET=your_super_secret_jwt_key_here
