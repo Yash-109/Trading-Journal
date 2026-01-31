@@ -63,11 +63,17 @@ const Analytics = () => {
     const cryptoTrades = normalizedTrades.filter(t => t.market === 'CRYPTO');
     const indianTrades = normalizedTrades.filter(t => t.market === 'INDIAN');
 
+    // Further separate INDIAN trades by instrument type
+    const indianIndexTrades = indianTrades.filter(t => t.instrumentType === 'INDEX' || !t.instrumentType);
+    const indianFNOTrades = indianTrades.filter(t => t.instrumentType === 'FNO');
+
     // Calculate stats for each market
     const marketStats = {
       FOREX: calculateStats(forexTrades),
       CRYPTO: calculateStats(cryptoTrades),
       INDIAN: calculateStats(indianTrades),
+      INDIAN_INDEX: calculateStats(indianIndexTrades),
+      INDIAN_FNO: calculateStats(indianFNOTrades),
       OVERALL: calculateStats(normalizedTrades),
     };
 
@@ -173,6 +179,72 @@ const Analytics = () => {
       { name: 'INDIAN', value: marketStats.INDIAN.totalTrades, color: '#8b5cf6' },
     ].filter(m => m.value > 0);
 
+    // ============================================================================
+    // INDIAN F&O ANALYTICS
+    // ============================================================================
+
+    // B. Option Type Performance
+    const byOptionType = {};
+    indianFNOTrades.forEach(trade => {
+      const optionType = trade.optionType || 'Unknown';
+      if (!byOptionType[optionType]) {
+        byOptionType[optionType] = { count: 0, wins: 0, pl: 0 };
+      }
+      byOptionType[optionType].count++;
+      byOptionType[optionType].pl += trade.pnl || 0;
+      if (trade.pnl > 0) byOptionType[optionType].wins++;
+    });
+
+    const optionTypeData = Object.entries(byOptionType).map(([optionType, data]) => ({
+      optionType,
+      count: data.count,
+      winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+      pl: data.pl,
+    }));
+
+    // C. Strike Price Performance
+    const byStrikePrice = {};
+    indianFNOTrades.forEach(trade => {
+      const strikePrice = trade.strikePrice || 0;
+      const key = strikePrice.toString();
+      if (!byStrikePrice[key]) {
+        byStrikePrice[key] = { count: 0, pl: 0 };
+      }
+      byStrikePrice[key].count++;
+      byStrikePrice[key].pl += trade.pnl || 0;
+    });
+
+    const strikePriceData = Object.entries(byStrikePrice)
+      .map(([strikePrice, data]) => ({
+        strikePrice: parseFloat(strikePrice),
+        count: data.count,
+        pl: data.pl,
+      }))
+      .sort((a, b) => a.strikePrice - b.strikePrice);
+
+    // D. Expiry Date Performance
+    const byExpiryDate = {};
+    indianFNOTrades.forEach(trade => {
+      const expiryDate = trade.expiryDate || 'Unknown';
+      if (!byExpiryDate[expiryDate]) {
+        byExpiryDate[expiryDate] = { count: 0, wins: 0, pl: 0 };
+      }
+      byExpiryDate[expiryDate].count++;
+      byExpiryDate[expiryDate].pl += trade.pnl || 0;
+      if (trade.pnl > 0) byExpiryDate[expiryDate].wins++;
+    });
+
+    const expiryDateData = Object.entries(byExpiryDate)
+      .map(([expiryDate, data]) => ({
+        expiryDate,
+        count: data.count,
+        winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+        pl: data.pl,
+      }))
+      .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+    // ============================================================================
+
     return {
       marketStats,
       marketData,
@@ -182,6 +254,11 @@ const Analytics = () => {
       strategyData,
       rulesData,
       winLossData,
+      // F&O Analytics
+      optionTypeData,
+      strikePriceData,
+      expiryDateData,
+      hasFNOTrades: indianFNOTrades.length > 0,
     };
   }, [normalizedTrades]);
 
@@ -496,6 +573,137 @@ const Analytics = () => {
                       </td>
                     </tr>
                   ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ============================================================================ */}
+      {/* INDIAN F&O ANALYTICS SECTION */}
+      {/* ============================================================================ */}
+
+      {/* F&O Option Type Performance */}
+      {analytics.hasFNOTrades && analytics.optionTypeData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.7 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Option Type Performance</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {analytics.optionTypeData.map((option, index) => (
+              <div
+                key={option.optionType}
+                className="bg-dark-bg border border-dark-border rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-white">{option.optionType}</h4>
+                  <span className="text-sm text-gray-400">{option.count} trades</span>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">Win Rate</span>
+                    <span className={(option.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                      {Number(option.winRate || 0).toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-400">P/L</span>
+                    <span className={(option.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                      {(option.pl || 0) >= 0 ? '+' : ''}{Number(option.pl || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* F&O Strike Price Performance */}
+      {analytics.hasFNOTrades && analytics.strikePriceData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Strike Price Performance</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-border">
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Strike Price</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Trades</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">P/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.strikePriceData
+                  .sort((a, b) => (b.pl || 0) - (a.pl || 0))
+                  .map((strike, index) => (
+                    <tr key={index} className="border-b border-dark-border/50">
+                      <td className="py-3 px-4 text-white font-semibold">
+                        {Number(strike.strikePrice).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-4 text-gray-300">{strike.count}</td>
+                      <td className="py-3 px-4">
+                        <span className={`font-semibold ${(strike.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {(strike.pl || 0) >= 0 ? '+' : ''}{Number(strike.pl || 0).toFixed(2)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
+
+      {/* F&O Expiry Date Performance */}
+      {analytics.hasFNOTrades && analytics.expiryDateData.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="bg-dark-card border border-dark-border rounded-xl p-6"
+        >
+          <h3 className="text-xl font-semibold text-white mb-6">F&O Expiry Date Performance</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-border">
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Expiry Date</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Trades</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">Win Rate</th>
+                  <th className="text-left py-3 px-4 text-gray-400 font-medium">P/L</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analytics.expiryDateData.map((expiry, index) => (
+                  <tr key={index} className="border-b border-dark-border/50">
+                    <td className="py-3 px-4 text-white font-semibold">
+                      {new Date(expiry.expiryDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </td>
+                    <td className="py-3 px-4 text-gray-300">{expiry.count}</td>
+                    <td className="py-3 px-4">
+                      <span className={(expiry.winRate || 0) >= 50 ? 'text-profit' : 'text-loss'}>
+                        {Number(expiry.winRate || 0).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`font-semibold ${(expiry.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {(expiry.pl || 0) >= 0 ? '+' : ''}{Number(expiry.pl || 0).toFixed(2)}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>

@@ -272,7 +272,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                     <option value="INDIAN">INDIAN</option>
                   </select>
                 </div>
-
+                  
                 {/* Instrument Type (INDIAN only) */}
                 {formData.market === 'INDIAN' && (
                   <div>
