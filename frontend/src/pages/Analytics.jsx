@@ -31,17 +31,57 @@ const Analytics = () => {
   const analytics = useMemo(() => {
     if (!normalizedTrades || normalizedTrades.length === 0) return null;
 
-    // By Pair
+    // Helper function to calculate stats for a subset of trades
+    const calculateStats = (trades) => {
+      if (!trades || trades.length === 0) {
+        return {
+          totalTrades: 0,
+          winningTrades: 0,
+          losingTrades: 0,
+          winRate: 0,
+          totalPnl: 0,
+          avgPnl: 0,
+        };
+      }
+
+      const winningTrades = trades.filter(t => t.pnl > 0).length;
+      const losingTrades = trades.filter(t => t.pnl < 0).length;
+      const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+
+      return {
+        totalTrades: trades.length,
+        winningTrades,
+        losingTrades,
+        winRate: trades.length > 0 ? (winningTrades / trades.length) * 100 : 0,
+        totalPnl,
+        avgPnl: trades.length > 0 ? totalPnl / trades.length : 0,
+      };
+    };
+
+    // Separate trades by market
+    const forexTrades = normalizedTrades.filter(t => t.market === 'FOREX');
+    const cryptoTrades = normalizedTrades.filter(t => t.market === 'CRYPTO');
+    const indianTrades = normalizedTrades.filter(t => t.market === 'INDIAN');
+
+    // Calculate stats for each market
+    const marketStats = {
+      FOREX: calculateStats(forexTrades),
+      CRYPTO: calculateStats(cryptoTrades),
+      INDIAN: calculateStats(indianTrades),
+      OVERALL: calculateStats(normalizedTrades),
+    };
+
+    // By Pair/Symbol (market-aware: use displayPair from normalized trades)
     const byPair = {};
     normalizedTrades.forEach(trade => {
-      const pair = trade.pair || 'Unknown';
-      if (!byPair[pair]) {
-        byPair[pair] = { wins: 0, losses: 0, total: 0, pl: 0 };
+      const key = trade.displayPair || 'Unknown';
+      if (!byPair[key]) {
+        byPair[key] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
-      byPair[pair].total++;
-      byPair[pair].pl += trade.pnl;
-      if (trade.pnl > 0) byPair[pair].wins++;
-      else byPair[pair].losses++;
+      byPair[key].total++;
+      byPair[key].pl += trade.pnl;
+      if (trade.pnl > 0) byPair[key].wins++;
+      else byPair[key].losses++;
     });
 
     const pairData = Object.entries(byPair).map(([pair, data]) => ({
@@ -126,7 +166,16 @@ const Analytics = () => {
       { name: 'Breakeven', value: breakeven, color: '#6b7280' },
     ];
 
+    // Market Distribution Data
+    const marketData = [
+      { name: 'FOREX', value: marketStats.FOREX.totalTrades, color: '#3b82f6' },
+      { name: 'CRYPTO', value: marketStats.CRYPTO.totalTrades, color: '#f59e0b' },
+      { name: 'INDIAN', value: marketStats.INDIAN.totalTrades, color: '#8b5cf6' },
+    ].filter(m => m.value > 0);
+
     return {
+      marketStats,
+      marketData,
       pairData,
       emotionData,
       sessionData,
