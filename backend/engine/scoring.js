@@ -22,17 +22,22 @@ const RULE_PENALTY_MAP = {
  * @returns {number} Final score (0-100)
  */
 export function calculateScore(ruleResults) {
+  // Guard against invalid input
+  if (!Array.isArray(ruleResults) || ruleResults.length === 0) {
+    return EQUITY_RULE_CONFIG.baseScore; // No rules = perfect score
+  }
+
   let score = EQUITY_RULE_CONFIG.baseScore;
 
   // Deduct penalties for each failed rule
   for (const rule of ruleResults) {
-    if (!rule.passed) {
+    if (rule && rule.passed === false) { // Explicit false check
       const penalty = RULE_PENALTY_MAP[rule.ruleId] || 0;
       score -= penalty;
     }
   }
 
-  // Clamp score between 0 and 100
+  // Clamp score between 0 and 100 (safety net)
   return Math.max(0, Math.min(100, score));
 }
 
