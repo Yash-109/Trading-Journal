@@ -192,7 +192,7 @@ Create `backend/.env`:
 ```env
 PORT=5000
 NODE_ENV=production
-MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/trading_journal
+MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/trading_journal
 JWT_SECRET=your_super_secret_jwt_key_min_32_chars
 JWT_EXPIRE=7d
 CLIENT_URL=https://your-frontend.vercel.app

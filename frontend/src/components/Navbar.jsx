@@ -14,7 +14,9 @@ import {
   TrendingUp,
   ChevronLeft,
   ChevronRight,
-  LogOut
+  LogOut,
+  Target,
+  ListChecks
 } from 'lucide-react';
 
 const Navbar = () => {
@@ -34,6 +36,8 @@ const Navbar = () => {
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/reflection', label: 'Reflection', icon: PenSquare },
     { path: '/rules', label: 'Rules', icon: ShieldCheck },
+    { path: '/evaluate/trade', label: 'Trade Evaluation', icon: Target },
+    { path: '/evaluate/session', label: 'Session Evaluation', icon: ListChecks },
     { path: '/settings', label: 'Settings', icon: Settings },
   ];
 

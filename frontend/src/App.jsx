@@ -12,6 +12,8 @@ import Rules from './pages/Rules';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import TradeEvaluation from './pages/TradeEvaluation';
+import SessionEvaluation from './pages/SessionEvaluation';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 
@@ -104,6 +106,8 @@ function App() {
                           <Route path="/reflection" element={<Reflection />} />
                           <Route path="/rules" element={<Rules />} />
                           <Route path="/settings" element={<Settings />} />
+                          <Route path="/evaluate/trade" element={<TradeEvaluation />} />
+                          <Route path="/evaluate/session" element={<SessionEvaluation />} />
                         </Routes>
                       </main>
                     </div>
