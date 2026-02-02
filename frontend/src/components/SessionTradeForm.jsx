@@ -66,13 +66,13 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
   return (
     <div className="space-y-6">
       {/* Add Trade Form */}
-      <form onSubmit={handleAddTrade} className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">Add Trade to Session</h3>
+      <form onSubmit={handleAddTrade} className="bg-card-bg rounded-lg border border-gray-700 p-6">
+        <h3 className="text-xl font-bold text-gray-100 mb-4">Add Trade to Session</h3>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Trade ID */}
           <div>
-            <label htmlFor="tradeId" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="tradeId" className="block text-sm font-medium text-gray-300 mb-2">
               Trade ID *
             </label>
             <input
@@ -82,14 +82,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.tradeId}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="e.g., T001"
             />
           </div>
 
           {/* Entry Price */}
           <div>
-            <label htmlFor="entryPrice" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="entryPrice" className="block text-sm font-medium text-gray-300 mb-2">
               Entry Price *
             </label>
             <input
@@ -100,14 +100,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.entryPrice}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="100.00"
             />
           </div>
 
           {/* Exit Price */}
           <div>
-            <label htmlFor="exitPrice" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="exitPrice" className="block text-sm font-medium text-gray-300 mb-2">
               Exit Price *
             </label>
             <input
@@ -118,14 +118,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.exitPrice}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="105.00"
             />
           </div>
 
           {/* Stop Loss */}
           <div>
-            <label htmlFor="stopLoss" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="stopLoss" className="block text-sm font-medium text-gray-300 mb-2">
               Stop Loss
             </label>
             <input
@@ -135,14 +135,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               name="stopLoss"
               value={formData.stopLoss}
               onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="98.00"
             />
           </div>
 
           {/* Quantity */}
           <div>
-            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="quantity" className="block text-sm font-medium text-gray-300 mb-2">
               Quantity *
             </label>
             <input
@@ -152,14 +152,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.quantity}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="10"
             />
           </div>
 
           {/* Risk Percent */}
           <div>
-            <label htmlFor="riskPercent" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="riskPercent" className="block text-sm font-medium text-gray-300 mb-2">
               Risk % *
             </label>
             <input
@@ -170,14 +170,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.riskPercent}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="0.8"
             />
           </div>
 
           {/* RR Ratio */}
           <div>
-            <label htmlFor="rrRatio" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="rrRatio" className="block text-sm font-medium text-gray-300 mb-2">
               Risk:Reward Ratio *
             </label>
             <input
@@ -188,14 +188,14 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.rrRatio}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="2.5"
             />
           </div>
 
           {/* PnL */}
           <div>
-            <label htmlFor="pnl" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="pnl" className="block text-sm font-medium text-gray-300 mb-2">
               P&L *
             </label>
             <input
@@ -206,7 +206,7 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
               value={formData.pnl}
               onChange={handleChange}
               required
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
               placeholder="50.00"
             />
           </div>
@@ -220,9 +220,9 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
             name="ruleFollowed"
             checked={formData.ruleFollowed}
             onChange={handleChange}
-            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            className="w-5 h-5 rounded border-dark-border bg-dark-bg text-gold-500 focus:ring-2 focus:ring-gold-500"
           />
-          <label htmlFor="ruleFollowed" className="ml-2 text-sm font-medium text-gray-700">
+          <label htmlFor="ruleFollowed" className="ml-2 text-sm font-medium text-gray-300">
             Trading rules were followed
           </label>
         </div>
@@ -230,7 +230,7 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
         {/* Add Trade Button */}
         <button
           type="submit"
-          className="mt-4 w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-md transition-colors focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+          className="mt-4 w-full btn-primary py-2.5"
         >
           + Add Trade to Session
         </button>
@@ -238,18 +238,18 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
 
       {/* Added Trades List */}
       {trades.length > 0 && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="bg-card-bg rounded-lg border border-gray-700 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-xl font-bold text-gray-800">
+            <h3 className="text-xl font-bold text-gray-100">
               Added Trades ({trades.length})
             </h3>
             <button
               onClick={onEvaluate}
               disabled={isLoading}
-              className={`py-2 px-6 rounded-md font-medium text-white transition-colors ${
+              className={`py-2.5 px-6 rounded-lg font-semibold transition-colors ${
                 isLoading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
+                  ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                  : 'btn-primary'
               }`}
             >
               {isLoading ? 'Evaluating...' : 'Evaluate Session'}
@@ -260,19 +260,19 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
             {trades.map((trade, index) => (
               <div
                 key={index}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                className="flex items-center justify-between p-3 bg-dark-bg rounded-lg border border-dark-border hover:border-gray-600 transition-colors"
               >
                 <div className="flex items-center gap-4 flex-1">
-                  <span className="font-semibold text-gray-800">{trade.tradeId}</span>
-                  <span className="text-sm text-gray-600">
+                  <span className="font-semibold text-gray-100">{trade.tradeId}</span>
+                  <span className="text-sm text-gray-400">
                     Entry: ${trade.entryPrice.toFixed(2)}
                   </span>
-                  <span className="text-sm text-gray-600">
+                  <span className="text-sm text-gray-400">
                     Exit: ${trade.exitPrice.toFixed(2)}
                   </span>
                   <span
                     className={`text-sm font-medium ${
-                      trade.pnl >= 0 ? 'text-green-600' : 'text-red-600'
+                      trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'
                     }`}
                   >
                     P&L: ${trade.pnl.toFixed(2)}
@@ -280,7 +280,7 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
                 </div>
                 <button
                   onClick={() => handleRemoveTrade(index)}
-                  className="text-red-600 hover:text-red-800 font-medium text-sm px-3 py-1 rounded hover:bg-red-50 transition-colors"
+                  className="text-red-400 hover:text-red-300 font-medium text-sm px-3 py-1 rounded hover:bg-red-900/20 transition-colors"
                 >
                   Remove
                 </button>
@@ -292,8 +292,8 @@ export default function SessionTradeForm({ trades, onTradesChange, onEvaluate, i
 
       {/* Empty State */}
       {trades.length === 0 && (
-        <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-          <p className="text-gray-600 text-lg">No trades added yet</p>
+        <div className="bg-dark-bg border-2 border-dashed border-gray-700 rounded-lg p-8 text-center">
+          <p className="text-gray-300 text-lg">No trades added yet</p>
           <p className="text-gray-500 text-sm mt-1">
             Add at least one trade to evaluate your session
           </p>

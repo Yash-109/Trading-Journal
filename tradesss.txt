@@ -1,0 +1,10 @@
+change quantity of 1 lot in index and f&o  index wise
+also in Indian market profit and loss should be in inr
+remove charges from all market
+remove session in Indian market
+Chart of performance by Pair
+Remove Emotion analysis as it is duplicate
+
+Take suggestion: in dashboard we have crypto + Indian market trade so convert rupees to usd
+remove F&O Strike Price Performance, F&O Expiry Date Performance in analytics
+

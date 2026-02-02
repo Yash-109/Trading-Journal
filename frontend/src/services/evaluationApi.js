@@ -3,7 +3,7 @@
  * Handles communication with trade evaluation endpoints
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 /**
  * Handle API response and extract data
@@ -41,7 +41,7 @@ async function handleResponse(response) {
  */
 export async function evaluateTrade(trade) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/evaluate/trade`, {
+    const response = await fetch(`${API_BASE_URL}/evaluate/trade`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -66,7 +66,7 @@ export async function evaluateTrade(trade) {
  */
 export async function evaluateSession(trades) {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/evaluate/session`, {
+    const response = await fetch(`${API_BASE_URL}/evaluate/session`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
