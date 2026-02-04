@@ -10,12 +10,14 @@
  * - Backend returns raw MongoDB data with field name: 'pnl'
  * - Frontend historically used: 'profitLoss'
  * - Some trades may have missing P/L that needs calculation
+ * - Indian INDEX/FNO trades use lot-based quantity calculation
  * - Need consistent win/loss classification everywhere
  * - Analytics were calculated differently on each page
  * 
  * SOLUTION:
  * - Single source of truth for trade normalization
  * - Unified P/L calculation logic
+ * - Lot-based quantity calculation for Indian markets
  * - Consistent numeric type safety
  * - Reusable across all pages
  * 
@@ -47,11 +49,32 @@
  * Handles:
  * - Field name mapping (backend pnl vs frontend profitLoss)
  * - Numeric type conversion
+ * - Lot-based quantity for Indian INDEX/FNO
  * - P/L derivation from entry/exit/quantity/direction
  * - Win/Loss/Open classification
  */
 
 import { useMemo } from 'react';
+
+/**
+ * Indian Index lot sizes (matching backend config)
+ */
+const INDEX_LOT_SIZES = {
+  NIFTY: 25,
+  BANKNIFTY: 15,
+  FINNIFTY: 25,
+  SENSEX: 10,
+  MIDCPNIFTY: 50,
+};
+
+/**
+ * Get lot size for Indian index
+ */
+const getLotSize = (symbol) => {
+  if (!symbol) return 1;
+  const upperSymbol = symbol.toUpperCase().trim();
+  return INDEX_LOT_SIZES[upperSymbol] || 1;
+};
 
 /**
  * Normalize a single trade object
@@ -67,22 +90,38 @@ export const normalizeTrade = (trade) => {
   const stopLoss = parseFloat(trade.stopLoss) || 0;
   const takeProfit = parseFloat(trade.takeProfit) || 0;
   const lotSize = parseFloat(trade.lotSize) || 0;
+  const lots = parseFloat(trade.lots) || 0;
   const rr = parseFloat(trade.rr) || 0;
   const tradeQuality = parseInt(trade.tradeQuality) || 5;
+
+  // Calculate actual quantity for Indian markets
+  let actualQuantity = parseFloat(trade.quantity) || 0;
+  if (trade.market === 'INDIAN' && (trade.instrumentType === 'INDEX' || trade.instrumentType === 'FNO') && lots > 0) {
+    const lotSizeForSymbol = getLotSize(trade.symbol);
+    actualQuantity = lots * lotSizeForSymbol;
+  }
 
   // Get P/L from either backend field (pnl) or frontend field (profitLoss)
   let pnl = parseFloat(trade.pnl) || parseFloat(trade.profitLoss) || 0;
 
   // Derive P/L from price data if missing and we have required fields
-  if (pnl === 0 && entry && exit && lotSize) {
+  if (pnl === 0 && entry && exit) {
     const direction = (trade.direction || '').toLowerCase();
     
-    if (direction === 'buy') {
-      // Long trades: P/L = (exit - entry) × lot size
-      pnl = (exit - entry) * lotSize;
-    } else if (direction === 'sell') {
-      // Short trades: P/L = (entry - exit) × lot size
-      pnl = (entry - exit) * lotSize;
+    if (trade.market === 'INDIAN' && actualQuantity > 0) {
+      // Indian market: quantity-based (from lots)
+      if (direction === 'buy') {
+        pnl = (exit - entry) * actualQuantity;
+      } else if (direction === 'sell') {
+        pnl = (entry - exit) * actualQuantity;
+      }
+    } else if (lotSize > 0) {
+      // FOREX/CRYPTO: lot-based
+      if (direction === 'buy') {
+        pnl = (exit - entry) * lotSize;
+      } else if (direction === 'sell') {
+        pnl = (entry - exit) * lotSize;
+      }
     }
   }
 
