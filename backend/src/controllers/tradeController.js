@@ -2,6 +2,7 @@
 // Handlers: createTrade, getTrades, getTradeById, updateTrade, deleteTrade
 
 import Trade from '../models/Trade.js';
+import { calculateQuantityFromLots } from '../../config/indianMarket.js';
 
 /**
  * Create a new trade
@@ -22,7 +23,7 @@ export const createTrade = async (req, res) => {
       // Indian market fields
       symbol,
       quantity,
-      charges,
+      lots,
       optionType,
       strikePrice,
       expiryDate,
@@ -38,6 +39,12 @@ export const createTrade = async (req, res) => {
       date 
     } = req.body;
     
+    // Calculate actual quantity from lots for Indian INDEX/FNO
+    let actualQuantity = quantity;
+    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO') && lots) {
+      actualQuantity = calculateQuantityFromLots(symbol, lots);
+    }
+    
     // Calculate P/L and R:R
     let calculatedPnl = pnl || 0;
     let calculatedRr = rr || 0;
@@ -47,16 +54,16 @@ export const createTrade = async (req, res) => {
       const exitPrice = parseFloat(exit);
       
       // P/L calculation based on market type
-      if (market === 'INDIAN' && quantity) {
-        const qty = parseFloat(quantity);
-        // Indian market: quantity-based calculation
+      if (market === 'INDIAN' && actualQuantity) {
+        const qty = parseFloat(actualQuantity);
+        // Indian market: quantity-based calculation (no charges)
         if (direction === 'Buy') {
           calculatedPnl = (exitPrice - entryPrice) * qty;
         } else if (direction === 'Sell') {
           calculatedPnl = (entryPrice - exitPrice) * qty;
         }
       } else if (lotSize) {
-        // FOREX/CRYPTO: lot-based calculation
+        // FOREX/CRYPTO: lot-based calculation (no charges)
         const lot = parseFloat(lotSize);
         if (direction === 'Buy') {
           calculatedPnl = (exitPrice - entryPrice) * lot;
@@ -96,8 +103,8 @@ export const createTrade = async (req, res) => {
       lotSize,
       // Indian market fields
       symbol,
-      quantity,
-      charges,
+      quantity: actualQuantity,
+      lots,
       optionType,
       strikePrice,
       expiryDate,
@@ -198,7 +205,7 @@ export const updateTrade = async (req, res) => {
       // Indian market fields
       symbol,
       quantity,
-      charges,
+      lots,
       optionType,
       strikePrice,
       expiryDate,
@@ -214,6 +221,12 @@ export const updateTrade = async (req, res) => {
       date 
     } = req.body;
 
+    // Calculate actual quantity from lots for Indian INDEX/FNO
+    let actualQuantity = quantity;
+    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO') && lots) {
+      actualQuantity = calculateQuantityFromLots(symbol, lots);
+    }
+
     // Calculate P/L and R:R
     let calculatedPnl = pnl || 0;
     let calculatedRr = rr || 0;
@@ -223,16 +236,16 @@ export const updateTrade = async (req, res) => {
       const exitPrice = parseFloat(exit);
       
       // P/L calculation based on market type
-      if (market === 'INDIAN' && quantity) {
-        const qty = parseFloat(quantity);
-        // Indian market: quantity-based calculation
+      if (market === 'INDIAN' && actualQuantity) {
+        const qty = parseFloat(actualQuantity);
+        // Indian market: quantity-based calculation (no charges)
         if (direction === 'Buy') {
           calculatedPnl = (exitPrice - entryPrice) * qty;
         } else if (direction === 'Sell') {
           calculatedPnl = (entryPrice - exitPrice) * qty;
         }
       } else if (lotSize) {
-        // FOREX/CRYPTO: lot-based calculation
+        // FOREX/CRYPTO: lot-based calculation (no charges)
         const lot = parseFloat(lotSize);
         if (direction === 'Buy') {
           calculatedPnl = (exitPrice - entryPrice) * lot;
@@ -275,8 +288,8 @@ export const updateTrade = async (req, res) => {
         lotSize,
         // Indian market fields
         symbol,
-        quantity,
-        charges,
+        quantity: actualQuantity,
+        lots,
         optionType,
         strikePrice,
         expiryDate,
