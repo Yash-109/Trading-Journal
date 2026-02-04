@@ -8,6 +8,7 @@ import {
   PieChart,
   Pie,
   Cell,
+  ReferenceLine,
   LineChart,
   Line,
   XAxis,
@@ -347,6 +348,7 @@ const Analytics = () => {
   }
 
   const COLORS = ['#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
+  const currencySymbol = getCurrencySymbol(predominantMarket);
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -377,7 +379,7 @@ const Analytics = () => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -387,10 +389,36 @@ const Analytics = () => {
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#151922',
-                  border: '1px solid #2d3748',
-                  borderRadius: '8px',
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const { name, value } = payload[0].payload;
+                  const total = analytics.winLossData.reduce((sum, d) => sum + d.value, 0);
+                  const percent = total > 0 ? (value / total) * 100 : 0;
+                  return (
+                    <div
+                      style={{
+                        backgroundColor: '#f9fafb',
+                        color: '#111827',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{name}</div>
+                      <div style={{ fontSize: 12 }}>Trades: {value}</div>
+                      <div style={{ fontSize: 12 }}>Share: {percent.toFixed(1)}%</div>
+                    </div>
+                  );
+                }}
+              />
+              <Legend
+                wrapperStyle={{ color: '#e5e7eb' }}
+                formatter={(value) => {
+                  const total = analytics.winLossData.reduce((sum, d) => sum + d.value, 0);
+                  const item = analytics.winLossData.find((d) => d.name === value);
+                  const percent = total > 0 && item ? (item.value / total) * 100 : 0;
+                  return `${value} (${percent.toFixed(0)}%)`;
                 }}
               />
             </PieChart>
@@ -411,7 +439,7 @@ const Analytics = () => {
                 cx="50%"
                 cy="50%"
                 labelLine={false}
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                 outerRadius={80}
                 fill="#8884d8"
                 dataKey="value"
@@ -421,10 +449,36 @@ const Analytics = () => {
                 ))}
               </Pie>
               <Tooltip
-                contentStyle={{
-                  backgroundColor: '#151922',
-                  border: '1px solid #2d3748',
-                  borderRadius: '8px',
+                content={({ active, payload }) => {
+                  if (!active || !payload || !payload.length) return null;
+                  const { name, value } = payload[0].payload;
+                  const total = analytics.rulesData.reduce((sum, d) => sum + d.value, 0);
+                  const percent = total > 0 ? (value / total) * 100 : 0;
+                  return (
+                    <div
+                      style={{
+                        backgroundColor: '#f9fafb',
+                        color: '#111827',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid #e5e7eb',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{name}</div>
+                      <div style={{ fontSize: 12 }}>Trades: {value}</div>
+                      <div style={{ fontSize: 12 }}>Share: {percent.toFixed(1)}%</div>
+                    </div>
+                  );
+                }}
+              />
+              <Legend
+                wrapperStyle={{ color: '#e5e7eb' }}
+                formatter={(value) => {
+                  const total = analytics.rulesData.reduce((sum, d) => sum + d.value, 0);
+                  const item = analytics.rulesData.find((d) => d.name === value);
+                  const percent = total > 0 && item ? (item.value / total) * 100 : 0;
+                  return `${value} (${percent.toFixed(0)}%)`;
                 }}
               />
             </PieChart>
@@ -741,19 +795,44 @@ const Analytics = () => {
       >
         <h3 className="text-xl font-semibold text-white mb-6">Performance by Pair</h3>
         <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={analytics.pairData}>
+          <BarChart data={[...analytics.pairData].sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" />
             <XAxis dataKey="pair" stroke="#9ca3af" />
-            <YAxis stroke="#9ca3af" />
+            <YAxis
+              stroke="#9ca3af"
+              tickFormatter={(value) => `${currencySymbol}${value}`}
+            />
+            <ReferenceLine y={0} stroke="#6b7280" strokeWidth={1} />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#151922',
-                border: '1px solid #2d3748',
-                borderRadius: '8px',
+              content={({ active, payload, label }) => {
+                if (!active || !payload || !payload.length) return null;
+                const value = payload[0].value;
+                return (
+                  <div
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      color: '#111827',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: 12 }}>Net P/L: {formatPnLWithSign(value, predominantMarket)}</div>
+                  </div>
+                );
               }}
             />
             <Legend />
-            <Bar dataKey="pl" name="Profit/Loss" fill="#f59e0b" />
+            <Bar dataKey="pl" name="Net P/L">
+              {[...analytics.pairData].sort((a, b) => Math.abs(b.pl) - Math.abs(a.pl)).map((entry, index) => (
+                <Cell
+                  key={`pair-bar-${index}`}
+                  fill={entry.pl >= 0 ? '#10b981' : '#ef4444'}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </motion.div>
