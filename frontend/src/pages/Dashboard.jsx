@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
+import { formatPnLWithSign } from '../utils/currencyFormatter';
 
 const Dashboard = () => {
   const { trades: rawTrades = [], reflections = [] } = useApp();
@@ -22,6 +23,16 @@ const Dashboard = () => {
   // Get normalized trades and statistics using centralized hooks
   const trades = useTrades(rawTrades);
   const stats = useTradeStats(trades);
+
+  // Determine predominant market for currency display
+  const predominantMarket = useMemo(() => {
+    if (!trades || trades.length === 0) return 'FOREX';
+    const marketCounts = trades.reduce((acc, t) => {
+      acc[t.market] = (acc[t.market] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.keys(marketCounts).reduce((a, b) => marketCounts[a] > marketCounts[b] ? a : b);
+  }, [trades]);
 
   // Equity curve data - shows cumulative P/L over time
   const equityData = useMemo(() => {
@@ -113,7 +124,7 @@ const Dashboard = () => {
         />
         <StatCard
           title="Total P/L"
-          value={`${stats.totalPnL >= 0 ? '+' : ''}${Number(stats.totalPnL || 0).toFixed(2)}`}
+          value={formatPnLWithSign(stats.totalPnL || 0, predominantMarket)}
           icon={DollarSign}
           color={stats.totalPnL >= 0 ? 'profit' : 'loss'}
         />
@@ -139,11 +150,11 @@ const Dashboard = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Best Trade</span>
-              <span className="text-profit font-semibold">+{Number(stats.bestTrade || 0).toFixed(2)}</span>
+              <span className="text-profit font-semibold">{formatPnLWithSign(stats.bestTrade || 0, predominantMarket)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Worst Trade</span>
-              <span className="text-loss font-semibold">{Number(stats.worstTrade || 0).toFixed(2)}</span>
+              <span className="text-loss font-semibold">{formatPnLWithSign(stats.worstTrade || 0, predominantMarket)}</span>
             </div>
           </div>
         </motion.div>
@@ -163,7 +174,7 @@ const Dashboard = () => {
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Avg Profit/Trade</span>
               <span className={`font-semibold ${stats.avgPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {stats.avgPnL >= 0 ? '+' : ''}{Number(stats.avgPnL || 0).toFixed(2)}
+                {formatPnLWithSign(stats.avgPnL || 0, predominantMarket)}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -296,7 +307,7 @@ const Dashboard = () => {
                     <td className="py-3 px-4 text-sm text-gray-300">
                       {format(new Date(trade.date), 'MMM dd, yyyy')}
                     </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-white">{trade.pair}</td>
+                    <td className="py-3 px-4 text-sm font-semibold text-white">{trade.displayPair || trade.pair}</td>
                     <td className="py-3 px-4 text-sm">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${
                         trade.direction === 'Buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
@@ -305,7 +316,7 @@ const Dashboard = () => {
                       </span>
                     </td>
                     <td className={`py-3 px-4 text-sm font-semibold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {trade.pnl >= 0 ? '+' : ''}{Number(trade.pnl).toFixed(2)}
+                      {formatPnLWithSign(trade.pnl, trade.market)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-300">1:{Number(trade.rr).toFixed(2)}</td>
                     <td className="py-3 px-4 text-sm text-gray-300">{trade.emotion}</td>

@@ -21,12 +21,23 @@ import { Download, TrendingUp, TrendingDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import { computeDecisionQualityAnalytics } from '../utils/decisionQualityAnalytics';
+import { formatPnLWithSign, getCurrencySymbol } from '../utils/currencyFormatter';
 
 const Analytics = () => {
   const { trades: rawTrades = [], settings } = useApp();
   
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
+
+  // Determine predominant market for currency display
+  const predominantMarket = useMemo(() => {
+    if (!normalizedTrades || normalizedTrades.length === 0) return 'FOREX';
+    const marketCounts = normalizedTrades.reduce((acc, t) => {
+      acc[t.market] = (acc[t.market] || 0) + 1;
+      return acc;
+    }, {});
+    return Object.keys(marketCounts).reduce((a, b) => marketCounts[a] > marketCounts[b] ? a : b);
+  }, [normalizedTrades]);
 
   // Analytics calculations from normalized trades
   const analytics = useMemo(() => {
@@ -298,7 +309,7 @@ const Analytics = () => {
       y += 7;
       pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
-      pdf.text(`Total P/L: ${Number(totalPL || 0).toFixed(2)} ${settings?.defaultCurrency || 'USD'}`, 20, y);
+      pdf.text(`Total P/L: ${formatPnLWithSign(totalPL || 0, predominantMarket)}`, 20, y);
       y += 15;
 
       // Best Performing Pair
@@ -309,7 +320,7 @@ const Analytics = () => {
         
         pdf.setFontSize(10);
         analytics.pairData.slice(0, 5).forEach(pair => {
-          pdf.text(`${pair.pair}: ${Number(pair.pl || 0).toFixed(2)} (${Number(pair.winRate || 0).toFixed(1)}% WR, ${pair.trades} trades)`, 20, y);
+          pdf.text(`${pair.pair}: ${formatPnLWithSign(pair.pl || 0, predominantMarket)} (${Number(pair.winRate || 0).toFixed(1)}% WR, ${pair.trades} trades)`, 20, y);
           y += 7;
         });
       }
@@ -549,15 +560,13 @@ const Analytics = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl, predominantMarket)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
                     <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl, predominantMarket)}
                     </span>
                   </div>
                 </div>
@@ -583,15 +592,13 @@ const Analytics = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl, predominantMarket)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
                     <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl, predominantMarket)}
                     </span>
                   </div>
                 </div>
@@ -623,8 +630,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={analytics.decisionQuality.qualityBuckets.poor.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {analytics.decisionQuality.qualityBuckets.poor.avgPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.qualityBuckets.poor.avgPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.poor.avgPnl, predominantMarket)}
                     </span>
                   </div>
                 </div>
@@ -645,8 +651,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={analytics.decisionQuality.qualityBuckets.average.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {analytics.decisionQuality.qualityBuckets.average.avgPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.qualityBuckets.average.avgPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.average.avgPnl, predominantMarket)}
                     </span>
                   </div>
                 </div>
@@ -667,8 +672,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={analytics.decisionQuality.qualityBuckets.good.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {analytics.decisionQuality.qualityBuckets.good.avgPnl >= 0 ? '+' : ''}
-                      {analytics.decisionQuality.qualityBuckets.good.avgPnl.toFixed(2)}
+                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.good.avgPnl, predominantMarket)}
                     </span>
                   </div>
                 </div>
@@ -707,12 +711,12 @@ const Analytics = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${emotion.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {emotion.avgPnl >= 0 ? '+' : ''}{emotion.avgPnl.toFixed(2)}
+                          {formatPnLWithSign(emotion.avgPnl, predominantMarket)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-bold ${emotion.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {emotion.totalPnl >= 0 ? '+' : ''}{emotion.totalPnl.toFixed(2)}
+                          {formatPnLWithSign(emotion.totalPnl, predominantMarket)}
                         </span>
                       </td>
                     </tr>
@@ -841,7 +845,7 @@ const Analytics = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">P/L</span>
                   <span className={(emotion.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                    {(emotion.pl || 0) >= 0 ? '+' : ''}{Number(emotion.pl || 0).toFixed(2)}
+                    {formatPnLWithSign(emotion.pl || 0, predominantMarket)}
                   </span>
                 </div>
               </div>
@@ -883,7 +887,7 @@ const Analytics = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${(strategy.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {(strategy.pl || 0) >= 0 ? '+' : ''}{Number(strategy.pl || 0).toFixed(2)}
+                          {formatPnLWithSign(strategy.pl || 0, predominantMarket)}
                         </span>
                       </td>
                     </tr>
