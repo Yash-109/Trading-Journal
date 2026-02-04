@@ -62,12 +62,12 @@ const tradeSchema = new mongoose.Schema(
       type: String,
       trim: true
     },
-    // Quantity of shares/contracts
+    // Quantity of shares/contracts (calculated from lots for INDEX/FNO)
     quantity: {
       type: Number
     },
-    // Trading charges (brokerage, taxes, etc.)
-    charges: {
+    // Number of lots (for INDEX/FNO trades)
+    lots: {
       type: Number
     },
     // Option type (CE - Call, PE - Put) for F&O trades

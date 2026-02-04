@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { useApp } from '../context/AppContext';
+import { formatPnLWithSign, getCurrencySymbol } from '../utils/currencyFormatter';
 
 const TradeModal = ({ isOpen, onClose, trade = null }) => {
   const { addTrade, updateTrade, settings } = useApp();
@@ -21,8 +22,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
     lotSize: '',
     // Indian market fields
     symbol: '',
-    quantity: '',
-    charges: '',
+    lots: '',
     optionType: '',
     strikePrice: '',
     expiryDate: '',
@@ -54,8 +54,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         lotSize: '',
         // Indian market fields
         symbol: '',
-        quantity: '',
-        charges: '',
+        lots: '',
         optionType: '',
         strikePrice: '',
         expiryDate: '',
@@ -73,11 +72,11 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
 
   // Calculate P/L and RR
   useEffect(() => {
-    const { entry, exit, stopLoss, takeProfit, direction, lotSize, market, quantity } = formData;
+    const { entry, exit, stopLoss, takeProfit, direction, lotSize, market, lots, symbol, instrumentType } = formData;
     
     // Determine if we have the required fields for calculation
     const hasForexFields = entry && exit && lotSize;
-    const hasIndianFields = entry && exit && quantity;
+    const hasIndianFields = entry && exit && lots;
     
     if ((market === 'INDIAN' && hasIndianFields) || (market !== 'INDIAN' && hasForexFields)) {
       const entryPrice = parseFloat(entry);
@@ -86,13 +85,27 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
       let pl = 0;
       
       if (market === 'INDIAN') {
-        // Indian market: quantity-based calculation
-        const qty = parseFloat(quantity);
+        // Indian market: lot-based calculation
+        // For INDEX/FNO: lots × lotSize × price difference
+        const numLots = parseFloat(lots);
+        
+        // Lot sizes for Indian indices (matching backend config)
+        const lotSizes = {
+          NIFTY: 25,
+          BANKNIFTY: 15,
+          FINNIFTY: 25,
+          SENSEX: 10,
+          MIDCPNIFTY: 50,
+        };
+        
+        const upperSymbol = (symbol || '').toUpperCase().trim();
+        const lotSize = lotSizes[upperSymbol] || 1;
+        const quantity = numLots * lotSize;
         
         if (direction === 'Buy') {
-          pl = (exitPrice - entryPrice) * qty;
+          pl = (exitPrice - entryPrice) * quantity;
         } else {
-          pl = (entryPrice - exitPrice) * qty;
+          pl = (entryPrice - exitPrice) * quantity;
         }
       } else {
         // FOREX/CRYPTO: lot-based calculation
@@ -124,7 +137,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
       
       setFormData(prev => ({ ...prev, profitLoss: pl, rr: parseFloat(Number(rr || 0).toFixed(2)) }));
     }
-  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize, formData.market, formData.quantity]);
+  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize, formData.market, formData.lots, formData.symbol, formData.instrumentType]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -171,8 +184,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         direction: formData.direction,
         entry: formData.entry,
         exit: formData.exit,
-        quantity: formData.quantity,
-        charges: formData.charges,
+        lots: formData.lots,
         date: formData.date,
         strategy: formData.strategy,
         ruleFollowed: formData.ruleFollowed,
@@ -458,19 +470,26 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                   />
                 </div>
 
-                {/* Lot Size (FOREX/CRYPTO) or Quantity (INDIAN) */}
+                {/* Lot Size (FOREX/CRYPTO) or Lots (INDIAN) */}
                 {formData.market === 'INDIAN' ? (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Quantity</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Lots {(formData.instrumentType === 'INDEX' || formData.instrumentType === 'FNO') && '*'}
+                    </label>
                     <input
                       type="number"
                       step="1"
-                      name="quantity"
-                      value={formData.quantity}
+                      name="lots"
+                      value={formData.lots}
                       onChange={handleChange}
-                      placeholder="0"
+                      placeholder="Number of lots"
                       className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                     />
+                    {(formData.instrumentType === 'INDEX' || formData.instrumentType === 'FNO') && formData.symbol && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        Lot size varies by index (e.g., NIFTY: 25, BANKNIFTY: 15)
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div>
@@ -487,37 +506,23 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                   </div>
                 )}
 
-                {/* Charges (INDIAN only) */}
-                {formData.market === 'INDIAN' && (
+                {/* Session (only for FOREX/CRYPTO) */}
+                {formData.market !== 'INDIAN' && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Charges</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="charges"
-                      value={formData.charges}
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Session</label>
+                    <select
+                      name="session"
+                      value={formData.session}
                       onChange={handleChange}
-                      placeholder="0.00"
                       className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                    />
+                    >
+                      <option value="London">London</option>
+                      <option value="New York">New York</option>
+                      <option value="Asia">Asia</option>
+                      <option value="Sydney">Sydney</option>
+                    </select>
                   </div>
                 )}
-
-                {/* Session */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Session</label>
-                  <select
-                    name="session"
-                    value={formData.session}
-                    onChange={handleChange}
-                    className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                  >
-                    <option value="London">London</option>
-                    <option value="New York">New York</option>
-                    <option value="Asia">Asia</option>
-                    <option value="Sydney">Sydney</option>
-                  </select>
-                </div>
 
                 {/* Strategy */}
                 <div>
@@ -578,7 +583,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Profit/Loss</label>
                   <p className={`text-2xl font-bold ${(formData.profitLoss || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {(formData.profitLoss || 0) >= 0 ? '+' : ''}{Number(formData.profitLoss || 0).toFixed(2)} {settings?.defaultCurrency || 'USD'}
+                    {formatPnLWithSign(formData.profitLoss || 0, formData.market)}
                   </p>
                 </div>
                 <div>

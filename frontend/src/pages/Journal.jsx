@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { formatPnLWithSign } from '../utils/currencyFormatter';
 
 const Journal = () => {
   const { trades: rawTrades = [], deleteTrade, addTrade } = useApp();
@@ -299,7 +300,7 @@ const Journal = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">P/L</p>
                   <p className={`text-sm font-bold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {trade.pnl >= 0 ? '+' : ''}{Number(trade.pnl).toFixed(2)}
+                    {formatPnLWithSign(trade.pnl, trade.market)}
                   </p>
                 </div>
                 <div>
