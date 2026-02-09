@@ -2,7 +2,7 @@
 // Handlers: createTrade, getTrades, getTradeById, updateTrade, deleteTrade
 
 import Trade from '../models/Trade.js';
-import { calculateQuantityFromLots } from '../../config/indianMarket.js';
+import { calculateQuantityFromLots, getContractSize } from '../../config/indianMarket.js';
 
 /**
  * Create a new trade
@@ -62,13 +62,15 @@ export const createTrade = async (req, res) => {
         } else if (direction === 'Sell') {
           calculatedPnl = (entryPrice - exitPrice) * qty;
         }
-      } else if (lotSize) {
-        // FOREX/CRYPTO: lot-based calculation (no charges)
+      } else if (lotSize && (market === 'FOREX' || market === 'CRYPTO' || market === 'COMMODITY')) {
+        // FOREX/CRYPTO/COMMODITY: lot-based calculation with contract size
         const lot = parseFloat(lotSize);
+        const contractSize = getContractSize(market, pair);
+        
         if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * lot;
+          calculatedPnl = (exitPrice - entryPrice) * contractSize * lot;
         } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * lot;
+          calculatedPnl = (entryPrice - exitPrice) * contractSize * lot;
         }
       }
       
@@ -244,13 +246,15 @@ export const updateTrade = async (req, res) => {
         } else if (direction === 'Sell') {
           calculatedPnl = (entryPrice - exitPrice) * qty;
         }
-      } else if (lotSize) {
-        // FOREX/CRYPTO: lot-based calculation (no charges)
+      } else if (lotSize && (market === 'FOREX' || market === 'CRYPTO' || market === 'COMMODITY')) {
+        // FOREX/CRYPTO/COMMODITY: lot-based calculation with contract size
         const lot = parseFloat(lotSize);
+        const contractSize = getContractSize(market, pair);
+        
         if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * lot;
+          calculatedPnl = (exitPrice - entryPrice) * contractSize * lot;
         } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * lot;
+          calculatedPnl = (entryPrice - exitPrice) * contractSize * lot;
         }
       }
       

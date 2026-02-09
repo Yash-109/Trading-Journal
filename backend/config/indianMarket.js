@@ -89,3 +89,58 @@ export const INDIAN_MARKET_CURRENCY = {
   symbol: '₹',
   name: 'Indian Rupee',
 };
+
+/**
+ * Contract sizes for FOREX, COMMODITY, and CRYPTO markets
+ * These define how many units are in one standard lot
+ */
+export const CONTRACT_SIZES = {
+  // FOREX pairs (standard lot = 100,000 units of base currency)
+  FOREX: {
+    'EURUSD': 100000,
+    'GBPUSD': 100000,
+    'USDJPY': 100000,
+    'USDCHF': 100000,
+    'AUDUSD': 100000,
+    'USDCAD': 100000,
+    'NZDUSD': 100000,
+    DEFAULT: 100000
+  },
+  // COMMODITY contracts
+  COMMODITY: {
+    'XAUUSD': 100,      // Gold: 100 troy ounces per lot ($1 move = $100 per lot)
+    'XAGUSD': 5000,     // Silver: 5000 troy ounces per lot
+    DEFAULT: 100
+  },
+  // CRYPTO contracts
+  CRYPTO: {
+    'BTCUSD': 1,        // Bitcoin: 1 BTC per lot
+    'ETHUSD': 1,        // Ethereum: 1 ETH per lot
+    'BTCUSDT': 1,
+    'ETHUSDT': 1,
+    DEFAULT: 1
+  }
+};
+
+/**
+ * Get contract size for a given market and pair/symbol
+ * @param {string} market - Market type ('FOREX', 'COMMODITY', 'CRYPTO')
+ * @param {string} pair - Trading pair/symbol (e.g., 'EURUSD', 'XAUUSD', 'BTCUSD')
+ * @returns {number} Contract size (units per lot)
+ */
+export const getContractSize = (market, pair) => {
+  if (!market || !pair) return 1;
+  
+  const upperMarket = market.toUpperCase();
+  const upperPair = pair.toUpperCase().trim();
+  
+  if (upperMarket === 'FOREX') {
+    return CONTRACT_SIZES.FOREX[upperPair] || CONTRACT_SIZES.FOREX.DEFAULT;
+  } else if (upperMarket === 'COMMODITY') {
+    return CONTRACT_SIZES.COMMODITY[upperPair] || CONTRACT_SIZES.COMMODITY.DEFAULT;
+  } else if (upperMarket === 'CRYPTO') {
+    return CONTRACT_SIZES.CRYPTO[upperPair] || CONTRACT_SIZES.CRYPTO.DEFAULT;
+  }
+  
+  return 1;
+};
