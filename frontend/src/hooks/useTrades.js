@@ -68,12 +68,61 @@ const INDEX_LOT_SIZES = {
 };
 
 /**
+ * Contract sizes for FOREX, COMMODITY, CRYPTO markets
+ */
+const CONTRACT_SIZES = {
+  // Forex pairs (standard lot = 100,000 units)
+  FOREX: {
+    'EURUSD': 100000,
+    'GBPUSD': 100000,
+    'USDJPY': 100000,
+    'USDCHF': 100000,
+    'AUDUSD': 100000,
+    'USDCAD': 100000,
+    'NZDUSD': 100000,
+    default: 100000
+  },
+  // Commodities
+  COMMODITY: {
+    'XAUUSD': 100,      // Gold: 100 ounces per lot
+    'XAGUSD': 5000,     // Silver: 5000 ounces per lot
+    default: 100
+  },
+  // Crypto
+  CRYPTO: {
+    'BTCUSD': 1,        // Bitcoin: 1 BTC per lot
+    'ETHUSD': 1,        // Ethereum: 1 ETH per lot
+    'BTCUSDT': 1,
+    'ETHUSDT': 1,
+    default: 1
+  }
+};
+
+/**
  * Get lot size for Indian index
  */
 const getLotSize = (symbol) => {
   if (!symbol) return 1;
   const upperSymbol = symbol.toUpperCase().trim();
   return INDEX_LOT_SIZES[upperSymbol] || 1;
+};
+
+/**
+ * Get contract size for FOREX/COMMODITY/CRYPTO
+ */
+const getContractSize = (market, pair) => {
+  if (!market || !pair) return 1;
+  const upperPair = pair.toUpperCase().trim();
+  
+  if (market === 'FOREX') {
+    return CONTRACT_SIZES.FOREX[upperPair] || CONTRACT_SIZES.FOREX.default;
+  } else if (market === 'COMMODITY') {
+    return CONTRACT_SIZES.COMMODITY[upperPair] || CONTRACT_SIZES.COMMODITY.default;
+  } else if (market === 'CRYPTO') {
+    return CONTRACT_SIZES.CRYPTO[upperPair] || CONTRACT_SIZES.CRYPTO.default;
+  }
+  
+  return 1;
 };
 
 /**
@@ -115,12 +164,14 @@ export const normalizeTrade = (trade) => {
       } else if (direction === 'sell') {
         pnl = (entry - exit) * actualQuantity;
       }
-    } else if (lotSize > 0) {
-      // FOREX/CRYPTO: lot-based
+    } else if (lotSize > 0 && (trade.market === 'FOREX' || trade.market === 'CRYPTO' || trade.market === 'COMMODITY')) {
+      // FOREX/CRYPTO/COMMODITY: lot-based with contract size
+      const contractSize = getContractSize(trade.market, trade.pair);
+      
       if (direction === 'buy') {
-        pnl = (exit - entry) * lotSize;
+        pnl = (exit - entry) * contractSize * lotSize;
       } else if (direction === 'sell') {
-        pnl = (entry - exit) * lotSize;
+        pnl = (entry - exit) * contractSize * lotSize;
       }
     }
   }

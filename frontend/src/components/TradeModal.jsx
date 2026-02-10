@@ -36,6 +36,35 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
     notes: '',
   });
 
+  // Contract size configurations
+  const CONTRACT_SIZES = {
+    // Forex pairs (standard lot = 100,000 units)
+    FOREX: {
+      'EURUSD': 100000,
+      'GBPUSD': 100000,
+      'USDJPY': 100000,
+      'USDCHF': 100000,
+      'AUDUSD': 100000,
+      'USDCAD': 100000,
+      'NZDUSD': 100000,
+      default: 100000
+    },
+    // Commodities
+    COMMODITY: {
+      'XAUUSD': 100,      // Gold: 100 ounces per lot
+      'XAGUSD': 5000,     // Silver: 5000 ounces per lot
+      default: 100
+    },
+    // Crypto
+    CRYPTO: {
+      'BTCUSD': 1,        // Bitcoin: 1 BTC per lot
+      'ETHUSD': 1,        // Ethereum: 1 ETH per lot
+      'BTCUSDT': 1,
+      'ETHUSDT': 1,
+      default: 1
+    }
+  };
+
   useEffect(() => {
     if (trade) {
       setFormData(trade);
@@ -72,21 +101,20 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
 
   // Calculate P/L and RR
   useEffect(() => {
-    const { entry, exit, stopLoss, takeProfit, direction, lotSize, market, lots, symbol, instrumentType } = formData;
+    const { entry, exit, stopLoss, takeProfit, direction, lotSize, market, lots, symbol, instrumentType, pair } = formData;
     
     // Determine if we have the required fields for calculation
-    const hasForexFields = entry && exit && lotSize;
+    const hasForexCryptoCommodityFields = entry && exit && lotSize;
     const hasIndianFields = entry && exit && lots;
     
-    if ((market === 'INDIAN' && hasIndianFields) || (market !== 'INDIAN' && hasForexFields)) {
+    if ((market === 'INDIAN' && hasIndianFields) || (['FOREX', 'CRYPTO', 'COMMODITY'].includes(market) && hasForexCryptoCommodityFields)) {
       const entryPrice = parseFloat(entry);
       const exitPrice = parseFloat(exit);
       
       let pl = 0;
       
       if (market === 'INDIAN') {
-        // Indian market: lot-based calculation
-        // For INDEX/FNO: lots × lotSize × price difference
+        // Indian market: lot-based calculation (UNCHANGED)
         const numLots = parseFloat(lots);
         
         // Lot sizes for Indian indices (matching backend config)
@@ -108,13 +136,25 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
           pl = (entryPrice - exitPrice) * quantity;
         }
       } else {
-        // FOREX/CRYPTO: lot-based calculation
+        // FOREX/CRYPTO/COMMODITY: contract-size based calculation
         const lot = parseFloat(lotSize);
+        const upperPair = (pair || '').toUpperCase().trim();
         
+        // Get contract size based on market and pair
+        let contractSize = 1;
+        if (market === 'FOREX') {
+          contractSize = CONTRACT_SIZES.FOREX[upperPair] || CONTRACT_SIZES.FOREX.default;
+        } else if (market === 'COMMODITY') {
+          contractSize = CONTRACT_SIZES.COMMODITY[upperPair] || CONTRACT_SIZES.COMMODITY.default;
+        } else if (market === 'CRYPTO') {
+          contractSize = CONTRACT_SIZES.CRYPTO[upperPair] || CONTRACT_SIZES.CRYPTO.default;
+        }
+        
+        // Calculate P&L based on direction
         if (direction === 'Buy') {
-          pl = (exitPrice - entryPrice) * lot;
+          pl = (exitPrice - entryPrice) * contractSize * lot;
         } else {
-          pl = (entryPrice - exitPrice) * lot;
+          pl = (entryPrice - exitPrice) * contractSize * lot;
         }
       }
       
@@ -137,7 +177,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
       
       setFormData(prev => ({ ...prev, profitLoss: pl, rr: parseFloat(Number(rr || 0).toFixed(2)) }));
     }
-  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize, formData.market, formData.lots, formData.symbol, formData.instrumentType]);
+  }, [formData.entry, formData.exit, formData.stopLoss, formData.takeProfit, formData.direction, formData.lotSize, formData.market, formData.lots, formData.symbol, formData.instrumentType, formData.pair]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -164,9 +204,9 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         }
       }
     } else {
-      // FOREX/CRYPTO validation
+      // FOREX/CRYPTO/COMMODITY validation
       if (!formData.pair || !formData.entry || !formData.exit) {
-        alert('Please fill in required fields: Pair, Entry, and Exit');
+        alert('Please fill in required fields: Pair/Symbol, Entry, and Exit');
         return;
       }
     }
@@ -185,6 +225,8 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         entry: formData.entry,
         exit: formData.exit,
         lots: formData.lots,
+        pnl: formData.profitLoss,  // Backend expects 'pnl' field
+        rr: formData.rr,
         date: formData.date,
         strategy: formData.strategy,
         ruleFollowed: formData.ruleFollowed,
@@ -200,7 +242,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         payload.expiryDate = formData.expiryDate;
       }
     } else {
-      // FOREX/CRYPTO payload (preserve existing behavior)
+      // FOREX/CRYPTO/COMMODITY payload
       payload = {
         id: formData.id,
         market: formData.market,
@@ -211,7 +253,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         takeProfit: formData.takeProfit,
         exit: formData.exit,
         lotSize: formData.lotSize,
-        profitLoss: formData.profitLoss,
+        pnl: formData.profitLoss,  // Backend expects 'pnl' field
         rr: formData.rr,
         session: formData.session,
         strategy: formData.strategy,
@@ -277,6 +319,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                     className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                   >
                     <option value="FOREX">FOREX</option>
+                    <option value="COMMODITY">COMMODITY</option>
                     <option value="CRYPTO">CRYPTO</option>
                     <option value="INDIAN">INDIAN</option>
                   </select>
@@ -313,38 +356,91 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                   />
                 </div>
 
-                {/* Pair (FOREX/CRYPTO) or Symbol (INDIAN) */}
+                {/* Pair (FOREX/CRYPTO/COMMODITY) or Symbol (INDIAN) */}
                 {formData.market === 'INDIAN' ? (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Symbol *</label>
-                    <input
-                      type="text"
+                    <select
                       name="symbol"
                       value={formData.symbol}
                       onChange={handleChange}
-                      placeholder="e.g., NIFTY, BANKNIFTY"
                       className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
                       required
-                    />
+                    >
+                      <option value="">Select symbol...</option>
+                      <option value="NIFTY">NIFTY (Lot: 25)</option>
+                      <option value="BANKNIFTY">BANKNIFTY (Lot: 15)</option>
+                      <option value="SENSEX">SENSEX (Lot: 10)</option>
+                      <option value="FINNIFTY">FINNIFTY (Lot: 25)</option>
+                      <option value="MIDCPNIFTY">MIDCPNIFTY (Lot: 50)</option>
+                    </select>
+                    {formData.symbol && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formData.symbol === 'NIFTY' && 'Lot size: 25 units | ₹65 per point'}
+                        {formData.symbol === 'BANKNIFTY' && 'Lot size: 15 units | ₹30 per point'}
+                        {formData.symbol === 'SENSEX' && 'Lot size: 10 units | ₹20 per point'}
+                        {formData.symbol === 'FINNIFTY' && 'Lot size: 25 units | ₹60 per point'}
+                        {formData.symbol === 'MIDCPNIFTY' && 'Lot size: 50 units | ₹120 per point'}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Pair *</label>
-                    <input
-                      type="text"
-                      name="pair"
-                      value={formData.pair}
-                      onChange={handleChange}
-                      list="pairs-list"
-                      placeholder="e.g., XAUUSD"
-                      className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-                      required
-                    />
-                    <datalist id="pairs-list">
-                      {settings.pairs.map(pair => (
-                        <option key={pair} value={pair} />
-                      ))}
-                    </datalist>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      {formData.market === 'FOREX' ? 'Pair *' : 
+                       formData.market === 'COMMODITY' ? 'Symbol *' : 
+                       'Pair *'}
+                    </label>
+                    {formData.market === 'FOREX' && (
+                      <select
+                        name="pair"
+                        value={formData.pair}
+                        onChange={handleChange}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select pair...</option>
+                        <option value="EURUSD">EURUSD</option>
+                        <option value="GBPUSD">GBPUSD</option>
+                        <option value="USDJPY">USDJPY</option>
+                        <option value="AUDUSD">AUDUSD</option>
+                        <option value="USDCAD">USDCAD</option>
+                      </select>
+                    )}
+                    {formData.market === 'COMMODITY' && (
+                      <select
+                        name="pair"
+                        value={formData.pair}
+                        onChange={handleChange}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select symbol...</option>
+                        <option value="XAUUSD">XAUUSD (Gold)</option>
+                      </select>
+                    )}
+                    {formData.market === 'CRYPTO' && (
+                      <select
+                        name="pair"
+                        value={formData.pair}
+                        onChange={handleChange}
+                        className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select pair...</option>
+                        <option value="BTCUSD">BTCUSD</option>
+                        <option value="ETHUSD">ETHUSD</option>
+                      </select>
+                    )}
+                    {/* Show contract size info */}
+                    {formData.pair && formData.lotSize && (
+                      <p className="text-xs text-gray-400 mt-1">
+                        {formData.market === 'FOREX' && '1 lot = 100,000 units'}
+                        {formData.market === 'COMMODITY' && formData.pair.toUpperCase() === 'XAUUSD' && '1 lot = 100 oz ($1 move = $100/lot)'}
+                        {formData.market === 'CRYPTO' && formData.pair.toUpperCase().includes('BTC') && '1 lot = 1 BTC'}
+                        {formData.market === 'CRYPTO' && formData.pair.toUpperCase().includes('ETH') && '1 lot = 1 ETH'}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -487,7 +583,11 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                     />
                     {(formData.instrumentType === 'INDEX' || formData.instrumentType === 'FNO') && formData.symbol && (
                       <p className="text-xs text-gray-400 mt-1">
-                        Lot size varies by index (e.g., NIFTY: 25, BANKNIFTY: 15)
+                        {formData.symbol === 'NIFTY' && 'Lot size: 25 units'}
+                        {formData.symbol === 'BANKNIFTY' && 'Lot size: 15 units'}
+                        {formData.symbol === 'SENSEX' && 'Lot size: 10 units'}
+                        {formData.symbol === 'FINNIFTY' && 'Lot size: 25 units'}
+                        {formData.symbol === 'MIDCPNIFTY' && 'Lot size: 50 units'}
                       </p>
                     )}
                   </div>
@@ -507,7 +607,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
                 )}
 
                 {/* Session (only for FOREX/CRYPTO) */}
-                {formData.market !== 'INDIAN' && (
+                {formData.market !== 'INDIAN' && formData.market !== 'COMMODITY' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">Session</label>
                     <select
