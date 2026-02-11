@@ -20,7 +20,7 @@ const tradeSchema = new mongoose.Schema(
     // Market type
     market: {
       type: String,
-      enum: ['FOREX', 'CRYPTO', 'INDIAN'],
+      enum: ['FOREX', 'CRYPTO', 'COMMODITY', 'INDIAN'],
       default: 'FOREX'
     },
     // Instrument type (relevant for INDIAN market)
