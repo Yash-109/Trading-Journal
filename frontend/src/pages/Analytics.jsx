@@ -22,27 +22,26 @@ import { Download, TrendingUp, TrendingDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import { computeDecisionQualityAnalytics } from '../utils/decisionQualityAnalytics';
-import { formatPnLWithSign, getCurrencySymbol } from '../utils/currencyFormatter';
+import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
+import { convertTradesArray } from '../utils/currencyConverter';
 
 const Analytics = () => {
   const { trades: rawTrades = [], settings } = useApp();
   
+  // Get account currency from settings
+  const accountCurrency = settings.defaultCurrency || 'USD';
+  
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
+  
+  // Convert all trades to account currency for analytics
+  const convertedTrades = useMemo(() => {
+    return convertTradesArray(normalizedTrades, accountCurrency);
+  }, [normalizedTrades, accountCurrency]);
 
-  // Determine predominant market for currency display
-  const predominantMarket = useMemo(() => {
-    if (!normalizedTrades || normalizedTrades.length === 0) return 'FOREX';
-    const marketCounts = normalizedTrades.reduce((acc, t) => {
-      acc[t.market] = (acc[t.market] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.keys(marketCounts).reduce((a, b) => marketCounts[a] > marketCounts[b] ? a : b);
-  }, [normalizedTrades]);
-
-  // Analytics calculations from normalized trades
+  // Analytics calculations from converted trades
   const analytics = useMemo(() => {
-    if (!normalizedTrades || normalizedTrades.length === 0) return null;
+    if (!convertedTrades || convertedTrades.length === 0) return null;
 
     // Helper function to calculate stats for a subset of trades
     const calculateStats = (trades) => {
@@ -57,9 +56,9 @@ const Analytics = () => {
         };
       }
 
-      const winningTrades = trades.filter(t => t.pnl > 0).length;
-      const losingTrades = trades.filter(t => t.pnl < 0).length;
-      const totalPnl = trades.reduce((sum, t) => sum + (t.pnl || 0), 0);
+      const winningTrades = trades.filter(t => t.convertedPnl > 0).length;
+      const losingTrades = trades.filter(t => t.convertedPnl < 0).length;
+      const totalPnl = trades.reduce((sum, t) => sum + (t.convertedPnl || 0), 0);
 
       return {
         totalTrades: trades.length,
@@ -72,9 +71,9 @@ const Analytics = () => {
     };
 
     // Separate trades by market
-    const forexTrades = normalizedTrades.filter(t => t.market === 'FOREX');
-    const cryptoTrades = normalizedTrades.filter(t => t.market === 'CRYPTO');
-    const indianTrades = normalizedTrades.filter(t => t.market === 'INDIAN');
+    const forexTrades = convertedTrades.filter(t => t.market === 'FOREX');
+    const cryptoTrades = convertedTrades.filter(t => t.market === 'CRYPTO');
+    const indianTrades = convertedTrades.filter(t => t.market === 'INDIAN');
 
     // Further separate INDIAN trades by instrument type
     const indianIndexTrades = indianTrades.filter(t => t.instrumentType === 'INDEX' || !t.instrumentType);
@@ -87,7 +86,7 @@ const Analytics = () => {
       INDIAN: calculateStats(indianTrades),
       INDIAN_INDEX: calculateStats(indianIndexTrades),
       INDIAN_FNO: calculateStats(indianFNOTrades),
-      OVERALL: calculateStats(normalizedTrades),
+      OVERALL: calculateStats(convertedTrades),
     };
 
     // By Pair/Symbol (market-aware: use displayPair from normalized trades)
@@ -98,8 +97,8 @@ const Analytics = () => {
         byPair[key] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
       byPair[key].total++;
-      byPair[key].pl += trade.pnl;
-      if (trade.pnl > 0) byPair[key].wins++;
+      byPair[key].pl += trade.convertedPnl;
+      if (trade.convertedPnl > 0) byPair[key].wins++;
       else byPair[key].losses++;
     });
 
@@ -112,14 +111,14 @@ const Analytics = () => {
 
     // By Emotion
     const byEmotion = {};
-    normalizedTrades.forEach(trade => {
+    convertedTrades.forEach(trade => {
       const emotion = trade.emotion || 'Unknown';
       if (!byEmotion[emotion]) {
         byEmotion[emotion] = { count: 0, wins: 0, pl: 0 };
       }
       byEmotion[emotion].count++;
-      byEmotion[emotion].pl += trade.pnl;
-      if (trade.pnl > 0) byEmotion[emotion].wins++;
+      byEmotion[emotion].pl += trade.convertedPnl;
+      if (trade.convertedPnl > 0) byEmotion[emotion].wins++;
     });
 
     const emotionData = Object.entries(byEmotion).map(([emotion, data]) => ({
@@ -131,14 +130,14 @@ const Analytics = () => {
 
     // By Session
     const bySession = {};
-    normalizedTrades.forEach(trade => {
+    convertedTrades.forEach(trade => {
       const session = trade.session || 'Unknown';
       if (!bySession[session]) {
         bySession[session] = { count: 0, wins: 0, pl: 0 };
       }
       bySession[session].count++;
-      bySession[session].pl += trade.pnl;
-      if (trade.pnl > 0) bySession[session].wins++;
+      bySession[session].pl += trade.convertedPnl;
+      if (trade.convertedPnl > 0) bySession[session].wins++;
     });
 
     const sessionData = Object.entries(bySession).map(([session, data]) => ({
@@ -156,8 +155,8 @@ const Analytics = () => {
         byStrategy[strategy] = { count: 0, wins: 0, pl: 0 };
       }
       byStrategy[strategy].count++;
-      byStrategy[strategy].pl += trade.pnl;
-      if (trade.pnl > 0) byStrategy[strategy].wins++;
+      byStrategy[strategy].pl += trade.convertedPnl;
+      if (trade.convertedPnl > 0) byStrategy[strategy].wins++;
     });
 
     const strategyData = Object.entries(byStrategy).map(([strategy, data]) => ({
@@ -168,17 +167,17 @@ const Analytics = () => {
     }));
 
     // Rule Compliance
-    const rulesFollowed = normalizedTrades.filter(t => t.ruleFollowed).length;
-    const rulesBroken = normalizedTrades.length - rulesFollowed;
+    const rulesFollowed = convertedTrades.filter(t => t.ruleFollowed).length;
+    const rulesBroken = convertedTrades.length - rulesFollowed;
     const rulesData = [
       { name: 'Followed', value: rulesFollowed, color: '#10b981' },
       { name: 'Broken', value: rulesBroken, color: '#ef4444' },
     ];
 
     // Win/Loss Distribution
-    const wins = normalizedTrades.filter(t => t.pnl > 0).length;
-    const losses = normalizedTrades.filter(t => t.pnl < 0).length;
-    const breakeven = normalizedTrades.filter(t => t.pnl === 0).length;
+    const wins = convertedTrades.filter(t => t.convertedPnl > 0).length;
+    const losses = convertedTrades.filter(t => t.convertedPnl < 0).length;
+    const breakeven = convertedTrades.filter(t => t.convertedPnl === 0).length;
     const winLossData = [
       { name: 'Wins', value: wins, color: '#10b981' },
       { name: 'Losses', value: losses, color: '#ef4444' },
@@ -204,8 +203,8 @@ const Analytics = () => {
         byOptionType[optionType] = { count: 0, wins: 0, pl: 0 };
       }
       byOptionType[optionType].count++;
-      byOptionType[optionType].pl += trade.pnl || 0;
-      if (trade.pnl > 0) byOptionType[optionType].wins++;
+      byOptionType[optionType].pl += trade.convertedPnl || 0;
+      if (trade.convertedPnl > 0) byOptionType[optionType].wins++;
     });
 
     const optionTypeData = Object.entries(byOptionType).map(([optionType, data]) => ({
@@ -224,7 +223,7 @@ const Analytics = () => {
         byStrikePrice[key] = { count: 0, pl: 0 };
       }
       byStrikePrice[key].count++;
-      byStrikePrice[key].pl += trade.pnl || 0;
+      byStrikePrice[key].pl += trade.convertedPnl || 0;
     });
 
     const strikePriceData = Object.entries(byStrikePrice)
@@ -243,8 +242,8 @@ const Analytics = () => {
         byExpiryDate[expiryDate] = { count: 0, wins: 0, pl: 0 };
       }
       byExpiryDate[expiryDate].count++;
-      byExpiryDate[expiryDate].pl += trade.pnl || 0;
-      if (trade.pnl > 0) byExpiryDate[expiryDate].wins++;
+      byExpiryDate[expiryDate].pl += trade.convertedPnl || 0;
+      if (trade.convertedPnl > 0) byExpiryDate[expiryDate].wins++;
     });
 
     const expiryDateData = Object.entries(byExpiryDate)
@@ -302,11 +301,11 @@ const Analytics = () => {
       y += 10;
       
       pdf.setFontSize(10);
-      const totalPL = normalizedTrades.reduce((sum, t) => sum + t.pnl, 0);
-      const wins = normalizedTrades.filter(t => t.pnl > 0).length;
-      const winRate = normalizedTrades.length > 0 ? (wins / normalizedTrades.length) * 100 : 0;
+      const totalPL = convertedTrades.reduce((sum, t) => sum + t.convertedPnl, 0);
+      const wins = convertedTrades.filter(t => t.convertedPnl > 0).length;
+      const winRate = convertedTrades.length > 0 ? (wins / convertedTrades.length) * 100 : 0;
       
-      pdf.text(`Total Trades: ${normalizedTrades.length}`, 20, y);
+      pdf.text(`Total Trades: ${convertedTrades.length}`, 20, y);
       y += 7;
       pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
@@ -334,7 +333,7 @@ const Analytics = () => {
     }
   };
 
-  if (!analytics || normalizedTrades.length === 0) {
+  if (!analytics || convertedTrades.length === 0) {
     return (
       <div className="space-y-6 animate-slide-in">
         <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>
@@ -348,15 +347,18 @@ const Analytics = () => {
   }
 
   const COLORS = ['#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899'];
-  const currencySymbol = getCurrencySymbol(predominantMarket);
-
   return (
     <div className="space-y-6 animate-slide-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Analytics</h1>
-          <p className="text-gray-400">Deep dive into your trading performance</p>
+          <p className="text-gray-400">
+            Deep dive into your trading performance. 
+            <span className="ml-2 text-gold-500 font-medium">
+              All metrics in {accountCurrency}
+            </span>
+          </p>
         </div>
         <button onClick={exportPDF} className="btn-primary flex items-center space-x-2">
           <Download className="w-5 h-5" />

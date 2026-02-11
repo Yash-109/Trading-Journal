@@ -130,13 +130,17 @@ const Settings = () => {
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-dark-border">
-            <p className="text-white font-medium">Default Currency</p>
+            <div>
+              <p className="text-white font-medium">Account Currency</p>
+              <p className="text-xs text-gray-500 mt-1">Currency used for P/L display across all panels</p>
+            </div>
             <select
               value={localSettings.defaultCurrency}
               onChange={(e) => setLocalSettings({ ...localSettings, defaultCurrency: e.target.value })}
               className="bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
             >
               <option value="USD">USD ($)</option>
+              <option value="INR">INR (₹)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
               <option value="JPY">JPY (¥)</option>

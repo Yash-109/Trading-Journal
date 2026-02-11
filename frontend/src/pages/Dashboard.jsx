@@ -15,51 +15,51 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
-import { formatPnLWithSign } from '../utils/currencyFormatter';
+import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
+import { convertTradesArray, getTotalPnL, getWinLossStats } from '../utils/currencyConverter';
 
 const Dashboard = () => {
-  const { trades: rawTrades = [], reflections = [] } = useApp();
+  const { trades: rawTrades = [], reflections = [], settings } = useApp();
+  
+  // Get account currency from settings
+  const accountCurrency = settings.defaultCurrency || 'USD';
   
   // Get normalized trades and statistics using centralized hooks
   const trades = useTrades(rawTrades);
-  const stats = useTradeStats(trades);
+  
+  // Convert all trades to account currency
+  const convertedTrades = useMemo(() => {
+    return convertTradesArray(trades, accountCurrency);
+  }, [trades, accountCurrency]);
+  
+  const stats = useTradeStats(convertedTrades);
 
-  // Determine predominant market for currency display
-  const predominantMarket = useMemo(() => {
-    if (!trades || trades.length === 0) return 'FOREX';
-    const marketCounts = trades.reduce((acc, t) => {
-      acc[t.market] = (acc[t.market] || 0) + 1;
-      return acc;
-    }, {});
-    return Object.keys(marketCounts).reduce((a, b) => marketCounts[a] > marketCounts[b] ? a : b);
-  }, [trades]);
-
-  // Equity curve data - shows cumulative P/L over time
+  // Equity curve data - shows cumulative P/L over time (in account currency)
   const equityData = useMemo(() => {
-    if (!trades || trades.length === 0) return [];
+    if (!convertedTrades || convertedTrades.length === 0) return [];
     
     // Sort trades by date (oldest first) for cumulative calculation
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sortedTrades = [...convertedTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
     let cumulative = 0;
     
     return sortedTrades.map((trade, index) => {
-      cumulative += trade.pnl;
+      cumulative += trade.convertedPnl;
       return {
         date: format(new Date(trade.date), 'MMM dd'),
         equity: cumulative,
         trade: index + 1,
       };
     });
-  }, [trades]);
+  }, [convertedTrades]);
 
   // Recent trades - sorted by date (newest first)
   const recentTrades = useMemo(() => {
-    if (!trades || trades.length === 0) return [];
+    if (!convertedTrades || convertedTrades.length === 0) return [];
     
-    return [...trades]
+    return [...convertedTrades]
       .sort((a, b) => new Date(b.date) - new Date(a.date))
       .slice(0, 5);
-  }, [trades]);
+  }, [convertedTrades]);
 
   // Trading quotes
   const quotes = [
@@ -79,7 +79,12 @@ const Dashboard = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-gray-400">Welcome back! Here's your trading overview.</p>
+          <p className="text-gray-400">
+            Welcome back! Here's your trading overview. 
+            <span className="ml-2 text-gold-500 font-medium">
+              All metrics shown in {accountCurrency}
+            </span>
+          </p>
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-400">Today</p>
@@ -315,8 +320,8 @@ const Dashboard = () => {
                         {trade.direction}
                       </span>
                     </td>
-                    <td className={`py-3 px-4 text-sm font-semibold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithSign(trade.pnl, trade.market)}
+                    <td className={`py-3 px-4 text-sm font-semibold ${trade.convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {formatPnLWithCurrency(trade.convertedPnl, accountCurrency)}
                     </td>
                     <td className="py-3 px-4 text-sm text-gray-300">1:{Number(trade.rr).toFixed(2)}</td>
                     <td className="py-3 px-4 text-sm text-gray-300">{trade.emotion}</td>

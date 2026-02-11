@@ -15,13 +15,22 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { formatPnLWithSign } from '../utils/currencyFormatter';
+import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
+import { convertTradesArray } from '../utils/currencyConverter';
 
 const Journal = () => {
-  const { trades: rawTrades = [], deleteTrade, addTrade } = useApp();
+  const { trades: rawTrades = [], deleteTrade, addTrade, settings } = useApp();
+  
+  // Get account currency from settings
+  const accountCurrency = settings.defaultCurrency || 'USD';
   
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
+  
+  // Convert trades to account currency
+  const convertedTrades = useMemo(() => {
+    return convertTradesArray(normalizedTrades, accountCurrency);
+  }, [normalizedTrades, accountCurrency]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -34,11 +43,11 @@ const Journal = () => {
     ruleFollowed: '',
   });
 
-  // Filter normalized trades
+  // Filter converted trades
   const filteredTrades = useMemo(() => {
-    if (!normalizedTrades || normalizedTrades.length === 0) return [];
+    if (!convertedTrades || convertedTrades.length === 0) return [];
     
-    return normalizedTrades.filter(trade => {
+    return convertedTrades.filter(trade => {
       const matchesSearch = 
         (trade.displayPair || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (trade.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -299,9 +308,14 @@ const Journal = () => {
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">P/L</p>
-                  <p className={`text-sm font-bold ${trade.pnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {formatPnLWithSign(trade.pnl, trade.market)}
+                  <p className={`text-sm font-bold ${trade.convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                    {formatPnLWithCurrency(trade.convertedPnl, accountCurrency)}
                   </p>
+                  {trade.tradeCurrency && trade.tradeCurrency !== accountCurrency && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formatPnLWithCurrency(trade.pnl, trade.tradeCurrency)}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 mb-1">R:R</p>
