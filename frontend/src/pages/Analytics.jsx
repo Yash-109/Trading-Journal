@@ -28,24 +28,49 @@ import { convertTradesArray } from '../utils/currencyConverter';
 const Analytics = () => {
   const { trades: rawTrades = [], settings } = useApp();
   
-  // Get account currency from settings
-  const accountCurrency = settings.defaultCurrency || 'USD';
+  // Get account currency from settings with safe fallback
+  const accountCurrency = settings?.defaultCurrency || 'USD';
+  
+  // Get currency symbol for display
+  const currencySymbol = getCurrencySymbol(accountCurrency);
   
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
   
+  // Defensively normalize trades before conversion
+  const safeTrades = useMemo(() => {
+    return (normalizedTrades || []).map(trade => ({
+      ...trade,
+      pnl: Number(trade?.pnl) || 0,
+      tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
+      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || 1,
+      market: trade?.market || 'FOREX',
+      instrumentType: trade?.instrumentType,
+      displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
+      emotion: trade?.emotion || 'Neutral',
+      session: trade?.session || 'Unknown',
+      strategy: trade?.strategy || 'None',
+      ruleFollowed: Boolean(trade?.ruleFollowed),
+      optionType: trade?.optionType,
+      strikePrice: Number(trade?.strikePrice) || 0,
+      expiryDate: trade?.expiryDate
+    }));
+  }, [normalizedTrades, accountCurrency]);
+  
   // Convert all trades to account currency for analytics
   const convertedTrades = useMemo(() => {
-    return convertTradesArray(normalizedTrades, accountCurrency);
-  }, [normalizedTrades, accountCurrency]);
+    return convertTradesArray(safeTrades, accountCurrency);
+  }, [safeTrades, accountCurrency]);
 
   // Analytics calculations from converted trades
   const analytics = useMemo(() => {
+    // Guard: Return null for empty trades
     if (!convertedTrades || convertedTrades.length === 0) return null;
 
     // Helper function to calculate stats for a subset of trades
     const calculateStats = (trades) => {
-      if (!trades || trades.length === 0) {
+      // Guard: Handle empty or invalid input
+      if (!trades || !Array.isArray(trades) || trades.length === 0) {
         return {
           totalTrades: 0,
           winningTrades: 0,
@@ -56,28 +81,31 @@ const Analytics = () => {
         };
       }
 
-      const winningTrades = trades.filter(t => t.convertedPnl > 0).length;
-      const losingTrades = trades.filter(t => t.convertedPnl < 0).length;
-      const totalPnl = trades.reduce((sum, t) => sum + (t.convertedPnl || 0), 0);
+      const winningTrades = trades.filter(t => t && Number(t.convertedPnl) > 0).length;
+      const losingTrades = trades.filter(t => t && Number(t.convertedPnl) < 0).length;
+      const totalPnl = trades.reduce((sum, t) => {
+        const pnl = Number(t?.convertedPnl) || 0;
+        return sum + (isFinite(pnl) ? pnl : 0);
+      }, 0);
 
       return {
         totalTrades: trades.length,
         winningTrades,
         losingTrades,
         winRate: trades.length > 0 ? (winningTrades / trades.length) * 100 : 0,
-        totalPnl,
+        totalPnl: Number(totalPnl) || 0,
         avgPnl: trades.length > 0 ? totalPnl / trades.length : 0,
       };
     };
 
     // Separate trades by market
-    const forexTrades = convertedTrades.filter(t => t.market === 'FOREX');
-    const cryptoTrades = convertedTrades.filter(t => t.market === 'CRYPTO');
-    const indianTrades = convertedTrades.filter(t => t.market === 'INDIAN');
+    const forexTrades = convertedTrades.filter(t => t && t.market === 'FOREX');
+    const cryptoTrades = convertedTrades.filter(t => t && t.market === 'CRYPTO');
+    const indianTrades = convertedTrades.filter(t => t && t.market === 'INDIAN');
 
     // Further separate INDIAN trades by instrument type
-    const indianIndexTrades = indianTrades.filter(t => t.instrumentType === 'INDEX' || !t.instrumentType);
-    const indianFNOTrades = indianTrades.filter(t => t.instrumentType === 'FNO');
+    const indianIndexTrades = indianTrades.filter(t => t && (t.instrumentType === 'INDEX' || !t.instrumentType));
+    const indianFNOTrades = indianTrades.filter(t => t && t.instrumentType === 'FNO');
 
     // Calculate stats for each market
     const marketStats = {
@@ -91,83 +119,91 @@ const Analytics = () => {
 
     // By Pair/Symbol (market-aware: use displayPair from normalized trades)
     const byPair = {};
-    normalizedTrades.forEach(trade => {
-      const key = trade.displayPair || 'Unknown';
+    convertedTrades.forEach(trade => {
+      if (!trade) return;
+      const key = trade.displayPair || trade.pair || trade.symbol || 'Unknown';
       if (!byPair[key]) {
         byPair[key] = { wins: 0, losses: 0, total: 0, pl: 0 };
       }
       byPair[key].total++;
-      byPair[key].pl += trade.convertedPnl;
-      if (trade.convertedPnl > 0) byPair[key].wins++;
-      else byPair[key].losses++;
+      const convertedPnl = Number(trade.convertedPnl) || 0;
+      byPair[key].pl += convertedPnl;
+      if (convertedPnl > 0) byPair[key].wins++;
+      else if (convertedPnl < 0) byPair[key].losses++;
     });
 
     const pairData = Object.entries(byPair).map(([pair, data]) => ({
       pair,
-      winRate: (data.wins / data.total) * 100,
+      winRate: data.total > 0 ? (data.wins / data.total) * 100 : 0,
       trades: data.total,
-      pl: data.pl,
-    })).sort((a, b) => b.pl - a.pl);
+      pl: Number(data.pl) || 0,
+    })).sort((a, b) => (b.pl || 0) - (a.pl || 0));
 
     // By Emotion
     const byEmotion = {};
     convertedTrades.forEach(trade => {
+      if (!trade) return;
       const emotion = trade.emotion || 'Unknown';
       if (!byEmotion[emotion]) {
         byEmotion[emotion] = { count: 0, wins: 0, pl: 0 };
       }
       byEmotion[emotion].count++;
-      byEmotion[emotion].pl += trade.convertedPnl;
-      if (trade.convertedPnl > 0) byEmotion[emotion].wins++;
+      const pnl = Number(trade.convertedPnl) || 0;
+      byEmotion[emotion].pl += pnl;
+      if (pnl > 0) byEmotion[emotion].wins++;
     });
 
     const emotionData = Object.entries(byEmotion).map(([emotion, data]) => ({
       emotion,
       count: data.count,
-      winRate: (data.wins / data.count) * 100,
-      pl: data.pl,
+      winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+      pl: Number(data.pl) || 0,
     }));
 
     // By Session
     const bySession = {};
     convertedTrades.forEach(trade => {
+      if (!trade) return;
       const session = trade.session || 'Unknown';
       if (!bySession[session]) {
         bySession[session] = { count: 0, wins: 0, pl: 0 };
       }
       bySession[session].count++;
-      bySession[session].pl += trade.convertedPnl;
-      if (trade.convertedPnl > 0) bySession[session].wins++;
+      const pnl = Number(trade.convertedPnl) || 0;
+      bySession[session].pl += pnl;
+      if (pnl > 0) bySession[session].wins++;
     });
 
     const sessionData = Object.entries(bySession).map(([session, data]) => ({
       session,
       count: data.count,
-      winRate: (data.wins / data.count) * 100,
-      pl: data.pl,
+      winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+      pl: Number(data.pl) || 0,
     }));
 
     // By Strategy
     const byStrategy = {};
-    normalizedTrades.forEach(trade => {
+    convertedTrades.forEach(trade => {
+      if (!trade) return;
       const strategy = trade.strategy || 'None';
       if (!byStrategy[strategy]) {
         byStrategy[strategy] = { count: 0, wins: 0, pl: 0 };
       }
       byStrategy[strategy].count++;
-      byStrategy[strategy].pl += trade.convertedPnl;
-      if (trade.convertedPnl > 0) byStrategy[strategy].wins++;
+      const pnl = Number(trade.convertedPnl) || 0;
+      byStrategy[strategy].pl += pnl;
+      if (pnl > 0) byStrategy[strategy].wins++;
     });
 
     const strategyData = Object.entries(byStrategy).map(([strategy, data]) => ({
       strategy,
       count: data.count,
-      winRate: (data.wins / data.count) * 100,
-      pl: data.pl,
+      winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
+      pl: Number(data.pl) || 0,
     }));
 
     // Rule Compliance
-    const rulesFollowed = convertedTrades.filter(t => t.ruleFollowed).length;
+    const rulesFollowed = convertedTrades.filter(t => t && t.ruleFollowed).length;
     const rulesBroken = convertedTrades.length - rulesFollowed;
     const rulesData = [
       { name: 'Followed', value: rulesFollowed, color: '#10b981' },
@@ -175,9 +211,9 @@ const Analytics = () => {
     ];
 
     // Win/Loss Distribution
-    const wins = convertedTrades.filter(t => t.convertedPnl > 0).length;
-    const losses = convertedTrades.filter(t => t.convertedPnl < 0).length;
-    const breakeven = convertedTrades.filter(t => t.convertedPnl === 0).length;
+    const wins = convertedTrades.filter(t => t && Number(t.convertedPnl) > 0).length;
+    const losses = convertedTrades.filter(t => t && Number(t.convertedPnl) < 0).length;
+    const breakeven = convertedTrades.filter(t => t && Number(t.convertedPnl) === 0).length;
     const winLossData = [
       { name: 'Wins', value: wins, color: '#10b981' },
       { name: 'Losses', value: losses, color: '#ef4444' },
@@ -198,52 +234,58 @@ const Analytics = () => {
     // B. Option Type Performance
     const byOptionType = {};
     indianFNOTrades.forEach(trade => {
+      if (!trade) return;
       const optionType = trade.optionType || 'Unknown';
       if (!byOptionType[optionType]) {
         byOptionType[optionType] = { count: 0, wins: 0, pl: 0 };
       }
       byOptionType[optionType].count++;
-      byOptionType[optionType].pl += trade.convertedPnl || 0;
-      if (trade.convertedPnl > 0) byOptionType[optionType].wins++;
+      const pnl = Number(trade.convertedPnl) || 0;
+      byOptionType[optionType].pl += pnl;
+      if (pnl > 0) byOptionType[optionType].wins++;
     });
 
     const optionTypeData = Object.entries(byOptionType).map(([optionType, data]) => ({
       optionType,
       count: data.count,
       winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
-      pl: data.pl,
+      pl: Number(data.pl) || 0,
     }));
 
     // C. Strike Price Performance
     const byStrikePrice = {};
     indianFNOTrades.forEach(trade => {
-      const strikePrice = trade.strikePrice || 0;
+      if (!trade) return;
+      const strikePrice = Number(trade.strikePrice) || 0;
       const key = strikePrice.toString();
       if (!byStrikePrice[key]) {
         byStrikePrice[key] = { count: 0, pl: 0 };
       }
       byStrikePrice[key].count++;
-      byStrikePrice[key].pl += trade.convertedPnl || 0;
+      const pnl = Number(trade.convertedPnl) || 0;
+      byStrikePrice[key].pl += pnl;
     });
 
     const strikePriceData = Object.entries(byStrikePrice)
       .map(([strikePrice, data]) => ({
-        strikePrice: parseFloat(strikePrice),
+        strikePrice: parseFloat(strikePrice) || 0,
         count: data.count,
-        pl: data.pl,
+        pl: Number(data.pl) || 0,
       }))
-      .sort((a, b) => a.strikePrice - b.strikePrice);
+      .sort((a, b) => (a.strikePrice || 0) - (b.strikePrice || 0));
 
     // D. Expiry Date Performance
     const byExpiryDate = {};
     indianFNOTrades.forEach(trade => {
+      if (!trade) return;
       const expiryDate = trade.expiryDate || 'Unknown';
       if (!byExpiryDate[expiryDate]) {
         byExpiryDate[expiryDate] = { count: 0, wins: 0, pl: 0 };
       }
       byExpiryDate[expiryDate].count++;
-      byExpiryDate[expiryDate].pl += trade.convertedPnl || 0;
-      if (trade.convertedPnl > 0) byExpiryDate[expiryDate].wins++;
+      const pnl = Number(trade.convertedPnl) || 0;
+      byExpiryDate[expiryDate].pl += pnl;
+      if (pnl > 0) byExpiryDate[expiryDate].wins++;
     });
 
     const expiryDateData = Object.entries(byExpiryDate)
@@ -251,16 +293,26 @@ const Analytics = () => {
         expiryDate,
         count: data.count,
         winRate: data.count > 0 ? (data.wins / data.count) * 100 : 0,
-        pl: data.pl,
+        pl: Number(data.pl) || 0,
       }))
-      .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+      .sort((a, b) => {
+        try {
+          return new Date(a.expiryDate) - new Date(b.expiryDate);
+        } catch {
+          return 0;
+        }
+      });
 
     // ============================================================================
 
-    // ============================================================================
-    // DECISION QUALITY ANALYTICS (Phase 6C)
-    // ============================================================================
-    const decisionQualityAnalytics = computeDecisionQualityAnalytics(normalizedTrades);
+    // Decision Quality Analytics with safe guards
+    let decisionQualityAnalytics = null;
+    try {
+      decisionQualityAnalytics = computeDecisionQualityAnalytics(convertedTrades);
+    } catch (error) {
+      console.error('Decision quality analytics error:', error);
+      decisionQualityAnalytics = null;
+    }
 
     return {
       marketStats,
@@ -279,7 +331,7 @@ const Analytics = () => {
       // Decision Quality Analytics
       decisionQuality: decisionQualityAnalytics,
     };
-  }, [normalizedTrades]);
+  }, [safeTrades, convertedTrades]);
 
   const exportPDF = () => {
     try {
@@ -301,26 +353,33 @@ const Analytics = () => {
       y += 10;
       
       pdf.setFontSize(10);
-      const totalPL = convertedTrades.reduce((sum, t) => sum + t.convertedPnl, 0);
-      const wins = convertedTrades.filter(t => t.convertedPnl > 0).length;
+      const totalPL = convertedTrades.reduce((sum, t) => {
+        const pnl = Number(t?.convertedPnl) || 0;
+        return sum + (isFinite(pnl) ? pnl : 0);
+      }, 0);
+      const wins = convertedTrades.filter(t => t && Number(t.convertedPnl) > 0).length;
       const winRate = convertedTrades.length > 0 ? (wins / convertedTrades.length) * 100 : 0;
       
-      pdf.text(`Total Trades: ${convertedTrades.length}`, 20, y);
+      pdf.text(`Total Trades: ${convertedTrades.length || 0}`, 20, y);
       y += 7;
       pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
-      pdf.text(`Total P/L: ${formatPnLWithSign(totalPL || 0, predominantMarket)}`, 20, y);
+      pdf.text(`Total P/L: ${formatPnLWithCurrency(Number(totalPL) || 0, accountCurrency)}`, 20, y);
       y += 15;
 
       // Best Performing Pair
-      if (analytics?.pairData.length > 0) {
+      if (analytics?.pairData && analytics.pairData.length > 0) {
         pdf.setFontSize(14);
         pdf.text('Top Performing Pairs', 20, y);
         y += 10;
         
         pdf.setFontSize(10);
         analytics.pairData.slice(0, 5).forEach(pair => {
-          pdf.text(`${pair.pair}: ${formatPnLWithSign(pair.pl || 0, predominantMarket)} (${Number(pair.winRate || 0).toFixed(1)}% WR, ${pair.trades} trades)`, 20, y);
+          if (!pair) return;
+          const pl = Number(pair.pl) || 0;
+          const winRate = Number(pair.winRate) || 0;
+          const trades = pair.trades || 0;
+          pdf.text(`${pair.pair || 'Unknown'}: ${formatPnLWithCurrency(pl, accountCurrency)} (${winRate.toFixed(1)}% WR, ${trades} trades)`, 20, y);
           y += 7;
         });
       }
@@ -615,14 +674,14 @@ const Analytics = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
-                    <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleFollowed.avgPnl, predominantMarket)}
+                    <span className={`font-semibold ${(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.avgPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
-                    <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleFollowed.totalPnl, predominantMarket)}
+                    <span className={`font-bold text-lg ${(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.totalPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -647,14 +706,14 @@ const Analytics = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
-                    <span className={`font-semibold ${analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleBroken.avgPnl, predominantMarket)}
+                    <span className={`font-semibold ${(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.avgPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
-                    <span className={`font-bold text-lg ${analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithSign(analytics.decisionQuality.ruleComparison.ruleBroken.totalPnl, predominantMarket)}
+                    <span className={`font-bold text-lg ${(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.totalPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -685,8 +744,8 @@ const Analytics = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
-                    <span className={analytics.decisionQuality.qualityBuckets.poor.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.poor.avgPnl, predominantMarket)}
+                    <span className={(analytics?.decisionQuality?.qualityBuckets?.poor?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.poor?.avgPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -706,8 +765,8 @@ const Analytics = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
-                    <span className={analytics.decisionQuality.qualityBuckets.average.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.average.avgPnl, predominantMarket)}
+                    <span className={(analytics?.decisionQuality?.qualityBuckets?.average?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.average?.avgPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -727,8 +786,8 @@ const Analytics = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
-                    <span className={analytics.decisionQuality.qualityBuckets.good.avgPnl >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithSign(analytics.decisionQuality.qualityBuckets.good.avgPnl, predominantMarket)}
+                    <span className={(analytics?.decisionQuality?.qualityBuckets?.good?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.good?.avgPnl) || 0, accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -766,13 +825,13 @@ const Analytics = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`font-semibold ${emotion.avgPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithSign(emotion.avgPnl, predominantMarket)}
+                        <span className={`font-semibold ${(emotion?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {formatPnLWithCurrency(Number(emotion?.avgPnl) || 0, accountCurrency)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`font-bold ${emotion.totalPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithSign(emotion.totalPnl, predominantMarket)}
+                        <span className={`font-bold ${(emotion?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {formatPnLWithCurrency(Number(emotion?.totalPnl) || 0, accountCurrency)}
                         </span>
                       </td>
                     </tr>
@@ -808,7 +867,7 @@ const Analytics = () => {
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload || !payload.length) return null;
-                const value = payload[0].value;
+                const value = Number(payload[0]?.value) || 0;
                 return (
                   <div
                     style={{
@@ -821,7 +880,7 @@ const Analytics = () => {
                     }}
                   >
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: 12 }}>Net P/L: {formatPnLWithSign(value, predominantMarket)}</div>
+                    <div style={{ fontSize: 12 }}>Net P/L: {formatPnLWithCurrency(value, accountCurrency)}</div>
                   </div>
                 );
               }}
@@ -885,10 +944,30 @@ const Analytics = () => {
             <XAxis dataKey="session" stroke="#9ca3af" />
             <YAxis stroke="#9ca3af" />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#151922',
-                border: '1px solid #2d3748',
-                borderRadius: '8px',
+              content={({ active, payload, label }) => {
+                if (!active || !payload || !payload.length) return null;
+                return (
+                  <div
+                    style={{
+                      backgroundColor: '#f9fafb',
+                      color: '#111827',
+                      padding: '8px 12px',
+                      borderRadius: '8px',
+                      border: '1px solid #e5e7eb',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                    {payload.map((entry, index) => (
+                      <div key={index} style={{ fontSize: 12 }}>
+                        {entry.name === 'Profit/Loss' 
+                          ? `P/L: ${formatPnLWithCurrency(Number(entry.value) || 0, accountCurrency)}`
+                          : `${entry.name}: ${Number(entry.value || 0).toFixed(1)}%`
+                        }
+                      </div>
+                    ))}
+                  </div>
+                );
               }}
             />
             <Legend />
@@ -925,8 +1004,8 @@ const Analytics = () => {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">P/L</span>
-                  <span className={(emotion.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                    {formatPnLWithSign(emotion.pl || 0, predominantMarket)}
+                  <span className={(emotion?.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
+                    {formatPnLWithCurrency(Number(emotion?.pl) || 0, accountCurrency)}
                   </span>
                 </div>
               </div>
@@ -967,8 +1046,8 @@ const Analytics = () => {
                         </span>
                       </td>
                       <td className="py-3 px-4">
-                        <span className={`font-semibold ${(strategy.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithSign(strategy.pl || 0, predominantMarket)}
+                        <span className={`font-semibold ${(strategy?.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                          {formatPnLWithCurrency(Number(strategy?.pl) || 0, accountCurrency)}
                         </span>
                       </td>
                     </tr>
@@ -1012,7 +1091,7 @@ const Analytics = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400">P/L</span>
                     <span className={(option.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                      {(option.pl || 0) >= 0 ? '+' : ''}{Number(option.pl || 0).toFixed(2)}
+                      {formatPnLWithCurrency(Number(option.pl || 0), accountCurrency)}
                     </span>
                   </div>
                 </div>
@@ -1051,7 +1130,7 @@ const Analytics = () => {
                       <td className="py-3 px-4 text-gray-300">{strike.count}</td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${(strike.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {(strike.pl || 0) >= 0 ? '+' : ''}{Number(strike.pl || 0).toFixed(2)}
+                          {formatPnLWithCurrency(Number(strike.pl || 0), accountCurrency)}
                         </span>
                       </td>
                     </tr>
@@ -1099,7 +1178,7 @@ const Analytics = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span className={`font-semibold ${(expiry.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {(expiry.pl || 0) >= 0 ? '+' : ''}{Number(expiry.pl || 0).toFixed(2)}
+                        {formatPnLWithCurrency(Number(expiry.pl || 0), accountCurrency)}
                       </span>
                     </td>
                   </tr>

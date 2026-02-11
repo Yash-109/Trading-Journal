@@ -21,43 +21,88 @@ import { convertTradesArray, getTotalPnL, getWinLossStats } from '../utils/curre
 const Dashboard = () => {
   const { trades: rawTrades = [], reflections = [], settings } = useApp();
   
-  // Get account currency from settings
-  const accountCurrency = settings.defaultCurrency || 'USD';
+  // Get account currency from settings with safe fallback
+  const accountCurrency = settings?.defaultCurrency || 'USD';
   
   // Get normalized trades and statistics using centralized hooks
   const trades = useTrades(rawTrades);
   
+  // Defensively normalize trades before conversion
+  const safeTrades = useMemo(() => {
+    return (trades || []).map(trade => ({
+      ...trade,
+      pnl: Number(trade?.pnl) || 0,
+      tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
+      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || 1,
+      date: trade?.date || new Date().toISOString(),
+      displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
+      direction: trade?.direction || 'Buy',
+      rr: Number(trade?.rr) || 0,
+      emotion: trade?.emotion || 'Neutral',
+      ruleFollowed: Boolean(trade?.ruleFollowed),
+      convertedPnl: 0 // Will be set by conversion
+    }));
+  }, [trades, accountCurrency]);
+  
   // Convert all trades to account currency
   const convertedTrades = useMemo(() => {
-    return convertTradesArray(trades, accountCurrency);
-  }, [trades, accountCurrency]);
+    return convertTradesArray(safeTrades, accountCurrency);
+  }, [safeTrades, accountCurrency]);
   
   const stats = useTradeStats(convertedTrades);
 
   // Equity curve data - shows cumulative P/L over time (in account currency)
   const equityData = useMemo(() => {
+    // Guard: Check if we have trades
     if (!convertedTrades || convertedTrades.length === 0) return [];
     
     // Sort trades by date (oldest first) for cumulative calculation
-    const sortedTrades = [...convertedTrades].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const sortedTrades = [...convertedTrades]
+      .filter(t => t && t.date) // Remove invalid trades
+      .sort((a, b) => {
+        try {
+          return new Date(a.date) - new Date(b.date);
+        } catch {
+          return 0;
+        }
+      });
+    
     let cumulative = 0;
     
     return sortedTrades.map((trade, index) => {
-      cumulative += trade.convertedPnl;
+      const pnlValue = Number(trade?.convertedPnl) || 0;
+      cumulative += isFinite(pnlValue) ? pnlValue : 0;
+      
+      // Safe date formatting
+      let dateStr = 'N/A';
+      try {
+        dateStr = format(new Date(trade.date), 'MMM dd');
+      } catch {
+        dateStr = `Trade ${index + 1}`;
+      }
+      
       return {
-        date: format(new Date(trade.date), 'MMM dd'),
-        equity: cumulative,
+        date: dateStr,
+        equity: Number(cumulative) || 0,
         trade: index + 1,
       };
-    });
+    }).filter(d => d && isFinite(d.equity)); // Remove invalid data points
   }, [convertedTrades]);
 
   // Recent trades - sorted by date (newest first)
   const recentTrades = useMemo(() => {
+    // Guard: Check if we have trades
     if (!convertedTrades || convertedTrades.length === 0) return [];
     
     return [...convertedTrades]
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .filter(t => t && t.date) // Remove invalid trades
+      .sort((a, b) => {
+        try {
+          return new Date(b.date) - new Date(a.date);
+        } catch {
+          return 0;
+        }
+      })
       .slice(0, 5);
   }, [convertedTrades]);
 
@@ -129,9 +174,9 @@ const Dashboard = () => {
         />
         <StatCard
           title="Total P/L"
-          value={formatPnLWithSign(stats.totalPnL || 0, predominantMarket)}
+          value={formatPnLWithCurrency(Number(stats?.totalPnL) || 0, accountCurrency)}
           icon={DollarSign}
-          color={stats.totalPnL >= 0 ? 'profit' : 'loss'}
+          color={(stats?.totalPnL || 0) >= 0 ? 'profit' : 'loss'}
         />
       </div>
 
@@ -147,19 +192,23 @@ const Dashboard = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Winning Trades</span>
-              <span className="text-profit font-semibold">{stats.winningTrades}</span>
+              <span className="text-profit font-semibold">{Number(stats?.winningTrades) || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Losing Trades</span>
-              <span className="text-loss font-semibold">{stats.losingTrades}</span>
+              <span className="text-loss font-semibold">{Number(stats?.losingTrades) || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Best Trade</span>
-              <span className="text-profit font-semibold">{formatPnLWithSign(stats.bestTrade || 0, predominantMarket)}</span>
+              <span className="text-profit font-semibold">
+                {formatPnLWithCurrency(Number(stats?.bestTrade) || 0, accountCurrency)}
+              </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Worst Trade</span>
-              <span className="text-loss font-semibold">{formatPnLWithSign(stats.worstTrade || 0, predominantMarket)}</span>
+              <span className="text-loss font-semibold">
+                {formatPnLWithCurrency(Number(stats?.worstTrade) || 0, accountCurrency)}
+              </span>
             </div>
           </div>
         </motion.div>
@@ -178,19 +227,23 @@ const Dashboard = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Avg Profit/Trade</span>
-              <span className={`font-semibold ${stats.avgPnL >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {formatPnLWithSign(stats.avgPnL || 0, predominantMarket)}
+              <span className={`font-semibold ${(stats?.avgPnL || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                {formatPnLWithCurrency(Number(stats?.avgPnL) || 0, accountCurrency)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Current Streak</span>
-              <span className={`font-semibold ${stats.streakType === 'win' ? 'text-profit' : stats.streakType === 'loss' ? 'text-loss' : 'text-gray-400'}`}>
-                {stats.currentStreak} {stats.streakType === 'win' ? '🔥' : stats.streakType === 'loss' ? '❄️' : '-'}
+              <span className={`font-semibold ${
+                stats?.streakType === 'win' ? 'text-profit' : 
+                stats?.streakType === 'loss' ? 'text-loss' : 
+                'text-gray-400'
+              }`}>
+                {Number(stats?.currentStreak) || 0} {stats?.streakType === 'win' ? '🔥' : stats?.streakType === 'loss' ? '❄️' : '-'}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Journal Entries</span>
-              <span className="text-blue-500 font-semibold">{reflections.length}</span>
+              <span className="text-blue-500 font-semibold">{reflections?.length || 0}</span>
             </div>
           </div>
         </motion.div>
@@ -203,31 +256,31 @@ const Dashboard = () => {
         >
           <h3 className="text-gray-400 text-sm font-medium mb-4">Quick Insights</h3>
           <div className="space-y-3">
-            {stats.consistencyScore < 70 && (
+            {(stats?.consistencyScore || 0) < 70 && (
               <div className="flex items-start space-x-2 text-sm">
                 <AlertCircle className="w-4 h-4 text-yellow-500 mt-0.5" />
                 <span className="text-gray-300">Focus on following your trading rules</span>
               </div>
             )}
-            {stats.winRate < 50 && (
+            {(stats?.winRate || 0) < 50 && (
               <div className="flex items-start space-x-2 text-sm">
                 <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
                 <span className="text-gray-300">Win rate below 50% - review your strategy</span>
               </div>
             )}
-            {stats.streakType === 'loss' && stats.currentStreak >= 3 && (
+            {stats?.streakType === 'loss' && (stats?.currentStreak || 0) >= 3 && (
               <div className="flex items-start space-x-2 text-sm">
                 <AlertCircle className="w-4 h-4 text-red-500 mt-0.5" />
                 <span className="text-gray-300">Consider reducing position size</span>
               </div>
             )}
-            {stats.totalPnL >= 0 && (
+            {(stats?.totalPnL || 0) >= 0 && (
               <div className="flex items-start space-x-2 text-sm">
                 <Award className="w-4 h-4 text-green-500 mt-0.5" />
                 <span className="text-gray-300">Great job! You're profitable</span>
               </div>
             )}
-            {stats.avgRR >= 2 && (
+            {(stats?.avgRR || 0) >= 2 && (
               <div className="flex items-start space-x-2 text-sm">
                 <Award className="w-4 h-4 text-gold-500 mt-0.5" />
                 <span className="text-gray-300">Excellent risk management!</span>
@@ -238,7 +291,7 @@ const Dashboard = () => {
       </div>
 
       {/* Equity Curve */}
-      {equityData.length > 0 && (
+      {equityData && equityData.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -307,33 +360,51 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {recentTrades.map((trade) => (
-                  <tr key={trade.id || trade._id} className="border-b border-dark-border/50 hover:bg-dark-hover transition-colors">
-                    <td className="py-3 px-4 text-sm text-gray-300">
-                      {format(new Date(trade.date), 'MMM dd, yyyy')}
-                    </td>
-                    <td className="py-3 px-4 text-sm font-semibold text-white">{trade.displayPair || trade.pair}</td>
-                    <td className="py-3 px-4 text-sm">
-                      <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                        trade.direction === 'Buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                      }`}>
-                        {trade.direction}
-                      </span>
-                    </td>
-                    <td className={`py-3 px-4 text-sm font-semibold ${trade.convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithCurrency(trade.convertedPnl, accountCurrency)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-300">1:{Number(trade.rr).toFixed(2)}</td>
-                    <td className="py-3 px-4 text-sm text-gray-300">{trade.emotion}</td>
-                    <td className="py-3 px-4 text-sm">
-                      {trade.ruleFollowed ? (
-                        <span className="text-green-400">✓</span>
-                      ) : (
-                        <span className="text-red-400">✗</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {recentTrades.map((trade, index) => {
+                  // Safe guards for all trade properties
+                  const tradeId = trade?.id || trade?._id || `trade-${index}`;
+                  const tradeDate = trade?.date || new Date().toISOString();
+                  const displayPair = trade?.displayPair || trade?.pair || trade?.symbol || 'N/A';
+                  const direction = trade?.direction || 'Buy';
+                  const convertedPnl = Number(trade?.convertedPnl) || 0;
+                  const rr = Number(trade?.rr) || 0;
+                  const emotion = trade?.emotion || 'N/A';
+                  const ruleFollowed = Boolean(trade?.ruleFollowed);
+                  
+                  return (
+                    <tr key={tradeId} className="border-b border-dark-border/50 hover:bg-dark-hover transition-colors">
+                      <td className="py-3 px-4 text-sm text-gray-300">
+                        {(() => {
+                          try {
+                            return format(new Date(tradeDate), 'MMM dd, yyyy');
+                          } catch {
+                            return 'Invalid Date';
+                          }
+                        })()}
+                      </td>
+                      <td className="py-3 px-4 text-sm font-semibold text-white">{displayPair}</td>
+                      <td className="py-3 px-4 text-sm">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                          direction === 'Buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                        }`}>
+                          {direction}
+                        </span>
+                      </td>
+                      <td className={`py-3 px-4 text-sm font-semibold ${convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {formatPnLWithCurrency(convertedPnl, accountCurrency)}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-gray-300">1:{rr.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-sm text-gray-300">{emotion}</td>
+                      <td className="py-3 px-4 text-sm">
+                        {ruleFollowed ? (
+                          <span className="text-green-400">✓</span>
+                        ) : (
+                          <span className="text-red-400">✗</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

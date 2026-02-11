@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Navbar from './components/Navbar';
 import DataSyncBanner from './components/DataSyncBanner';
 import KeyboardShortcuts from './components/KeyboardShortcuts';
+import ErrorBoundary from './components/ErrorBoundary';
 import Dashboard from './pages/Dashboard';
 import Journal from './pages/Journal';
 import Analytics from './pages/Analytics';
@@ -100,9 +101,23 @@ function App() {
                       <main className="container mx-auto px-4 py-6 max-w-7xl">
                         <Routes>
                           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                          <Route path="/dashboard" element={<Dashboard />} />
+                          <Route 
+                            path="/dashboard" 
+                            element={
+                              <ErrorBoundary message="Dashboard temporarily unavailable. Please try refreshing the page.">
+                                <Dashboard />
+                              </ErrorBoundary>
+                            } 
+                          />
                           <Route path="/journal" element={<Journal />} />
-                          <Route path="/analytics" element={<Analytics />} />
+                          <Route 
+                            path="/analytics" 
+                            element={
+                              <ErrorBoundary message="Analytics temporarily unavailable. Please try refreshing the page.">
+                                <Analytics />
+                              </ErrorBoundary>
+                            } 
+                          />
                           <Route path="/reflection" element={<Reflection />} />
                           <Route path="/rules" element={<Rules />} />
                           <Route path="/settings" element={<Settings />} />
