@@ -3,6 +3,8 @@
 
 import Trade from '../models/Trade.js';
 import { calculateQuantityFromLots, getContractSize } from '../../config/indianMarket.js';
+import { getTradeCurrencyFromPair } from '../utils/getTradeCurrencyFromPair.js';
+import { getTodayUsdInrRate } from '../services/exchangeRateService.js';
 
 /**
  * Create a new trade
@@ -91,6 +93,29 @@ export const createTrade = async (req, res) => {
       }
     }
     
+    // === CURRENCY LOGIC ===
+    // Determine trade currency based on market and pair
+    const tradeCurrency = getTradeCurrencyFromPair({ pair, market, symbol });
+    
+    // Get account currency from request (defaults to USD)
+    // TODO: This should come from user settings in the future
+    const accountCurrency = req.body.accountCurrency || 'USD';
+    
+    // Determine exchange rate
+    let exchangeRateAtExecution = 1;
+    
+    if (tradeCurrency !== accountCurrency) {
+      // Different currencies - fetch today's rate
+      const todayRate = await getTodayUsdInrRate();
+      
+      if (tradeCurrency === 'USD' && accountCurrency === 'INR') {
+        exchangeRateAtExecution = todayRate;
+      } else if (tradeCurrency === 'INR' && accountCurrency === 'USD') {
+        exchangeRateAtExecution = todayRate;
+      }
+    }
+    // === END CURRENCY LOGIC ===
+    
     // Create trade with userId from auth middleware
     const trade = await Trade.create({
       userId: req.user.userId,
@@ -112,6 +137,8 @@ export const createTrade = async (req, res) => {
       expiryDate,
       // Common fields
       pnl: calculatedPnl,
+      tradeCurrency,
+      exchangeRateAtExecution,
       rr: calculatedRr,
       session,
       strategy,
