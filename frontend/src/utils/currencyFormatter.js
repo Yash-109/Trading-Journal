@@ -1,33 +1,38 @@
 /**
  * Currency Formatting Utilities
- * Market-aware currency formatting for P&L display
+ * Professional currency system with account currency support
  * 
- * Indian markets: ₹ (INR)
- * Forex/Crypto: $ (USD)
+ * Supports: USD, INR
  */
 
-/**
- * Get currency symbol based on market type
- * @param {string} market - Market type: 'INDIAN', 'FOREX', 'CRYPTO'
- * @returns {string} Currency symbol
- */
-export const getCurrencySymbol = (market) => {
-  if (market === 'INDIAN') {
-    return '₹';
-  }
-  return '$'; // Default for FOREX and CRYPTO
+// Currency symbol mapping
+const CURRENCY_SYMBOLS = {
+  USD: '$',
+  INR: '₹',
+  EUR: '€',
+  GBP: '£',
+  JPY: '¥'
 };
 
 /**
- * Get currency code based on market type
- * @param {string} market - Market type: 'INDIAN', 'FOREX', 'CRYPTO'
+ * Get currency symbol from currency code
+ * @param {string} currencyCode - Currency code (USD, INR, etc.)
+ * @returns {string} Currency symbol
+ */
+export const getCurrencySymbol = (currencyCode = 'USD') => {
+  return CURRENCY_SYMBOLS[currencyCode] || '$';
+};
+
+/**
+ * Get currency code based on market type (for backwards compatibility)
+ * @param {string} market - Market type: 'INDIAN', 'FOREX', 'CRYPTO', 'COMMODITY'
  * @returns {string} Currency code
  */
 export const getCurrencyCode = (market) => {
   if (market === 'INDIAN') {
     return 'INR';
   }
-  return 'USD'; // Default for FOREX and CRYPTO
+  return 'USD'; // Default for FOREX, CRYPTO, COMMODITY
 };
 
 /**
@@ -39,10 +44,34 @@ export const getCurrencyCode = (market) => {
  */
 export const formatPnL = (value, market = 'FOREX', showSign = true) => {
   const num = parseFloat(value) || 0;
-  const symbol = getCurrencySymbol(market);
+  const symbol = getCurrencySymbol(getCurrencyCode(market));
   const sign = showSign && num > 0 ? '+' : '';
   
   return `${sign}${symbol}${Math.abs(num).toFixed(2)}${num < 0 ? '' : ''}`.replace('₹-', '-₹').replace('$-', '-$');
+};
+
+/**
+ * Format P&L with currency code (new preferred method)
+ * @param {number} value - P&L amount
+ * @param {string} currencyCode - Currency code (USD, INR, etc.)
+ * @param {boolean} showSign - Whether to show + for positive values
+ * @returns {string} Formatted P&L string
+ */
+export const formatPnLWithCurrency = (value, currencyCode = 'USD', showSign = true) => {
+  const num = parseFloat(value) || 0;
+  const symbol = getCurrencySymbol(currencyCode);
+  
+  if (num === 0) return `${symbol}0.00`;
+  
+  const absValue = Math.abs(num).toFixed(2);
+  
+  if (num > 0 && showSign) {
+    return `+${symbol}${absValue}`;
+  } else if (num < 0) {
+    return `-${symbol}${absValue}`;
+  } else {
+    return `${symbol}${absValue}`;
+  }
 };
 
 /**
@@ -54,7 +83,7 @@ export const formatPnL = (value, market = 'FOREX', showSign = true) => {
  */
 export const formatPnLWithSign = (value, market = 'FOREX') => {
   const num = parseFloat(value) || 0;
-  const symbol = getCurrencySymbol(market);
+  const symbol = getCurrencySymbol(getCurrencyCode(market));
   const absValue = Math.abs(num).toFixed(2);
   
   if (num >= 0) {
@@ -72,7 +101,20 @@ export const formatPnLWithSign = (value, market = 'FOREX') => {
  */
 export const formatCurrency = (value, market = 'FOREX') => {
   const num = parseFloat(value) || 0;
-  const symbol = getCurrencySymbol(market);
+  const symbol = getCurrencySymbol(getCurrencyCode(market));
+  
+  return `${symbol}${Math.abs(num).toFixed(2)}`;
+};
+
+/**
+ * Format currency with currency code (new preferred method)
+ * @param {number} value - Amount
+ * @param {string} currencyCode - Currency code (USD, INR, etc.)
+ * @returns {string} Formatted currency string
+ */
+export const formatCurrencyValue = (value, currencyCode = 'USD') => {
+  const num = parseFloat(value) || 0;
+  const symbol = getCurrencySymbol(currencyCode);
   
   return `${symbol}${Math.abs(num).toFixed(2)}`;
 };

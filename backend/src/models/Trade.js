@@ -20,7 +20,7 @@ const tradeSchema = new mongoose.Schema(
     // Market type
     market: {
       type: String,
-      enum: ['FOREX', 'CRYPTO', 'INDIAN'],
+      enum: ['FOREX', 'CRYPTO', 'COMMODITY', 'INDIAN'],
       default: 'FOREX'
     },
     // Instrument type (relevant for INDIAN market)
@@ -87,6 +87,21 @@ const tradeSchema = new mongoose.Schema(
     pnl: {
       type: Number,
       default: 0
+    },
+    // Currency in which trade was executed (immutable)
+    tradeCurrency: {
+      type: String,
+      enum: ['USD', 'INR'],
+      required: true,
+      default: 'USD',
+      immutable: true
+    },
+    // Exchange rate at trade execution time
+    exchangeRateAtExecution: {
+      type: Number,
+      required: true,
+      default: 1,
+      min: 0
     },
     // Risk:Reward ratio
     rr: {

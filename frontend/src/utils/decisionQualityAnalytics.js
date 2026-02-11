@@ -98,11 +98,11 @@ export const computeRawMetrics = (trades) => {
   const avgTradeQuality = qualitySum / trades.length;
 
   // 3. Win Rate
-  const wins = trades.filter(t => t.pnl > 0).length;
+  const wins = trades.filter(t => (t.convertedPnl || t.pnl) > 0).length;
   const winRate = (wins / trades.length) * 100;
 
   // 4. PnL Consistency (using coefficient of variation - lower is more consistent)
-  const pnlValues = trades.map(t => t.pnl || 0);
+  const pnlValues = trades.map(t => t.convertedPnl || t.pnl || 0);
   const pnlMean = pnlValues.reduce((sum, val) => sum + val, 0) / pnlValues.length;
   const pnlVariance = pnlValues.reduce((sum, val) => sum + Math.pow(val - pnlMean, 2), 0) / pnlValues.length;
   const pnlStdDev = Math.sqrt(pnlVariance);
@@ -191,8 +191,8 @@ export const computeRuleComparisonMetrics = (trades) => {
     if (tradesList.length === 0) {
       return { trades: 0, winRate: 0, avgPnl: 0, totalPnl: 0 };
     }
-    const wins = tradesList.filter(t => t.pnl > 0).length;
-    const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const wins = tradesList.filter(t => (t.convertedPnl || t.pnl) > 0).length;
+    const totalPnl = tradesList.reduce((sum, t) => sum + (t.convertedPnl || t.pnl || 0), 0);
     return {
       trades: tradesList.length,
       winRate: (wins / tradesList.length) * 100,
@@ -243,8 +243,8 @@ export const computeQualityBucketMetrics = (trades) => {
     if (tradesList.length === 0) {
       return { trades: 0, winRate: 0, avgPnl: 0 };
     }
-    const wins = tradesList.filter(t => t.pnl > 0).length;
-    const totalPnl = tradesList.reduce((sum, t) => sum + (t.pnl || 0), 0);
+    const wins = tradesList.filter(t => (t.convertedPnl || t.pnl) > 0).length;
+    const totalPnl = tradesList.reduce((sum, t) => sum + (t.convertedPnl || t.pnl || 0), 0);
     return {
       trades: tradesList.length,
       winRate: (wins / tradesList.length) * 100,
@@ -277,8 +277,8 @@ export const computeEmotionPerformanceMetrics = (trades) => {
       byEmotion[emotion] = { trades: [], wins: 0, totalPnl: 0 };
     }
     byEmotion[emotion].trades.push(trade);
-    byEmotion[emotion].totalPnl += trade.pnl || 0;
-    if (trade.pnl > 0) byEmotion[emotion].wins++;
+    byEmotion[emotion].totalPnl += trade.convertedPnl || trade.pnl || 0;
+    if ((trade.convertedPnl || trade.pnl) > 0) byEmotion[emotion].wins++;
   });
 
   return Object.entries(byEmotion).map(([emotion, data]) => ({

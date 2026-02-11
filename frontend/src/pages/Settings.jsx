@@ -1,59 +1,32 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { 
   Moon, 
-  Sun, 
   Download, 
   Upload, 
   Trash2, 
   Plus,
   Minus,
   Save,
-  AlertCircle,
-  HardDrive,
-  Cloud,
-  Wifi,
-  WifiOff
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Settings = () => {
-  const { settings, updateSettings, exportData, importData, trades, reflections, rules } = useApp();
+  const { settings, updateSettings, exportData, importData } = useApp();
   const [localSettings, setLocalSettings] = useState(settings);
   const [newPair, setNewPair] = useState('');
   const [newStrategy, setNewStrategy] = useState('');
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const [lastSaved, setLastSaved] = useState(null);
+  const [isDangerZoneOpen, setIsDangerZoneOpen] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const fileInputRef = useRef(null);
-
-  // Check online status
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-
-  // Get last saved time
-  useEffect(() => {
-    const savedTime = localStorage.getItem('lastSaved');
-    if (savedTime) {
-      setLastSaved(new Date(savedTime));
-    }
-  }, []);
 
   const handleSave = async () => {
     await updateSettings(localSettings);
-    const now = new Date();
-    setLastSaved(now);
-    localStorage.setItem('lastSaved', now.toISOString());
+    toast.success('Settings saved successfully');
   };
 
   const handleAddPair = () => {
@@ -105,22 +78,25 @@ const Settings = () => {
   };
 
   const handleClearAllData = () => {
-    if (window.confirm('⚠️ WARNING: This will delete ALL your data including trades, reflections, and rules. This action cannot be undone. Are you absolutely sure?')) {
-      if (window.confirm('This is your final warning. All data will be permanently deleted. Continue?')) {
-        // TODO: Implement clear all data via backend API
-        toast.success('All data cleared. Reloading...');
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
-      }
+    setShowDeleteModal(true);
+  };
+
+  const confirmClearAllData = () => {
+    if (deleteConfirmText === 'DELETE') {
+      // TODO: Implement clear all data via backend API
+      localStorage.clear();
+      toast.success('All data cleared. Reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    } else {
+      toast.error('Please type DELETE to confirm');
     }
   };
 
-  const dataStats = {
-    trades: trades.length,
-    reflections: reflections.length,
-    rules: rules.length,
-    totalSize: new Blob([JSON.stringify({ trades, reflections, rules })]).size,
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteConfirmText('');
   };
 
   return (
@@ -128,7 +104,7 @@ const Settings = () => {
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-white mb-2">Settings</h1>
-        <p className="text-gray-400">Customize your trading journal experience</p>
+        <p className="text-gray-400">Configure your trading journal</p>
       </div>
 
       {/* Appearance */}
@@ -141,41 +117,22 @@ const Settings = () => {
         
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white font-medium">Theme</p>
-              <p className="text-sm text-gray-400">Choose your preferred color scheme</p>
-            </div>
+            <p className="text-white font-medium">Theme</p>
             <div className="flex items-center space-x-2 bg-dark-bg rounded-lg p-1">
               <button
                 onClick={() => setLocalSettings({ ...localSettings, theme: 'dark' })}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  localSettings.theme === 'dark'
-                    ? 'bg-gold-500 text-black'
-                    : 'text-gray-400 hover:text-white'
-                }`}
+                className="flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors bg-gold-500 text-black"
               >
                 <Moon className="w-4 h-4" />
                 <span>Dark</span>
-              </button>
-              <button
-                onClick={() => setLocalSettings({ ...localSettings, theme: 'light' })}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-colors ${
-                  localSettings.theme === 'light'
-                    ? 'bg-gold-500 text-black'
-                    : 'text-gray-400 hover:text-white'
-                }`}
-                disabled
-              >
-                <Sun className="w-4 h-4" />
-                <span>Light (Coming Soon)</span>
               </button>
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-dark-border">
             <div>
-              <p className="text-white font-medium">Default Currency</p>
-              <p className="text-sm text-gray-400">Currency used for P/L calculations</p>
+              <p className="text-white font-medium">Account Currency</p>
+              <p className="text-xs text-gray-500 mt-1">Currency used for P/L display across all panels</p>
             </div>
             <select
               value={localSettings.defaultCurrency}
@@ -183,6 +140,7 @@ const Settings = () => {
               className="bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
             >
               <option value="USD">USD ($)</option>
+              <option value="INR">INR (₹)</option>
               <option value="EUR">EUR (€)</option>
               <option value="GBP">GBP (£)</option>
               <option value="JPY">JPY (¥)</option>
@@ -191,194 +149,144 @@ const Settings = () => {
         </div>
       </motion.div>
 
-      {/* Trading Pairs */}
+      {/* Trading Configuration */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="bg-dark-card border border-dark-border rounded-xl p-6"
       >
-        <h2 className="text-xl font-semibold text-white mb-6">Trading Pairs</h2>
+        <h2 className="text-xl font-semibold text-white mb-6">Trading Configuration</h2>
         
-        <div className="mb-4">
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={newPair}
-              onChange={(e) => setNewPair(e.target.value.toUpperCase())}
-              onKeyPress={(e) => e.key === 'Enter' && handleAddPair()}
-              placeholder="Add new pair (e.g., XAUUSD)"
-              className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-            />
-            <button onClick={handleAddPair} className="btn-primary">
-              <Plus className="w-5 h-5" />
-            </button>
+        {/* Trading Pairs */}
+        <div className="mb-6">
+          <p className="text-white font-medium mb-3">Trading Pairs</p>
+          <div className="mb-3">
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={newPair}
+                onChange={(e) => setNewPair(e.target.value.toUpperCase())}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddPair()}
+                placeholder="e.g., XAUUSD"
+                className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+              />
+              <button onClick={handleAddPair} className="btn-primary">
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {localSettings.pairs.map((pair) => (
+              <div
+                key={pair}
+                className="flex items-center space-x-2 bg-dark-bg border border-dark-border rounded-lg px-3 py-2"
+              >
+                <span className="text-white font-medium">{pair}</span>
+                <button
+                  onClick={() => handleRemovePair(pair)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {localSettings.pairs.map((pair) => (
-            <div
-              key={pair}
-              className="flex items-center space-x-2 bg-dark-bg border border-dark-border rounded-lg px-3 py-2"
-            >
-              <span className="text-white font-medium">{pair}</span>
-              <button
-                onClick={() => handleRemovePair(pair)}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <Minus className="w-4 h-4" />
+        {/* Trading Strategies */}
+        <div className="pt-6 border-t border-dark-border">
+          <p className="text-white font-medium mb-3">Trading Strategies</p>
+          <div className="mb-3">
+            <div className="flex space-x-2">
+              <input
+                type="text"
+                value={newStrategy}
+                onChange={(e) => setNewStrategy(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddStrategy()}
+                placeholder="e.g., Breakout"
+                className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
+              />
+              <button onClick={handleAddStrategy} className="btn-primary">
+                <Plus className="w-5 h-5" />
               </button>
             </div>
-          ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {localSettings.strategies.map((strategy) => (
+              <div
+                key={strategy}
+                className="flex items-center space-x-2 bg-dark-bg border border-dark-border rounded-lg px-3 py-2"
+              >
+                <span className="text-white font-medium">{strategy}</span>
+                <button
+                  onClick={() => handleRemoveStrategy(strategy)}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       </motion.div>
 
-      {/* Strategies */}
+      {/* Backup */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         className="bg-dark-card border border-dark-border rounded-xl p-6"
       >
-        <h2 className="text-xl font-semibold text-white mb-6">Trading Strategies</h2>
+        <h2 className="text-xl font-semibold text-white mb-6">Backup</h2>
         
-        <div className="mb-4">
-          <div className="flex space-x-2">
-            <input
-              type="text"
-              value={newStrategy}
-              onChange={(e) => setNewStrategy(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleAddStrategy()}
-              placeholder="Add new strategy (e.g., Breakout)"
-              className="flex-1 bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent"
-            />
-            <button onClick={handleAddStrategy} className="btn-primary">
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
+        <div className="space-y-3">
+          <button
+            onClick={handleExport}
+            className="w-full flex items-center justify-center space-x-2 bg-gold-500 hover:bg-gold-600 text-black font-semibold px-4 py-2.5 rounded-lg transition-colors"
+          >
+            <Download className="w-5 h-5" />
+            <span>Download Backup (JSON)</span>
+          </button>
 
-        <div className="flex flex-wrap gap-2">
-          {localSettings.strategies.map((strategy) => (
-            <div
-              key={strategy}
-              className="flex items-center space-x-2 bg-dark-bg border border-dark-border rounded-lg px-3 py-2"
-            >
-              <span className="text-white font-medium">{strategy}</span>
-              <button
-                onClick={() => handleRemoveStrategy(strategy)}
-                className="text-gray-400 hover:text-red-500 transition-colors"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full flex items-center justify-center space-x-2 bg-dark-bg hover:bg-dark-bg/80 border border-dark-border text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
+          >
+            <Upload className="w-5 h-5" />
+            <span>Upload Backup</span>
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".json"
+            onChange={handleImport}
+            className="hidden"
+          />
         </div>
       </motion.div>
 
-      {/* Data Management */}
+      {/* Danger Zone */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
-        className="bg-dark-card border border-dark-border rounded-xl p-6"
+        className="bg-dark-card border border-red-500/20 rounded-xl overflow-hidden"
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold text-white">Data Management</h2>
-          <div className="flex items-center space-x-2">
-            {isOnline ? (
-              <div className="flex items-center space-x-2 text-green-400 text-sm">
-                <Wifi className="w-4 h-4" />
-                <span>Online</span>
-              </div>
-            ) : (
-              <div className="flex items-center space-x-2 text-yellow-400 text-sm">
-                <WifiOff className="w-4 h-4" />
-                <span>Offline</span>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Last Saved Info */}
-        {lastSaved && (
-          <div className="mb-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-            <div className="flex items-center space-x-2 text-sm text-green-400">
-              <Save className="w-4 h-4" />
-              <span>Last saved: {lastSaved.toLocaleString()}</span>
-            </div>
-          </div>
-        )}
-
-        {/* Data Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-dark-bg rounded-lg p-4 border border-dark-border">
-            <p className="text-gray-400 text-sm mb-1">Trades</p>
-            <p className="text-2xl font-bold text-white">{dataStats.trades}</p>
-          </div>
-          <div className="bg-dark-bg rounded-lg p-4 border border-dark-border">
-            <p className="text-gray-400 text-sm mb-1">Reflections</p>
-            <p className="text-2xl font-bold text-white">{dataStats.reflections}</p>
-          </div>
-          <div className="bg-dark-bg rounded-lg p-4 border border-dark-border">
-            <p className="text-gray-400 text-sm mb-1">Rules</p>
-            <p className="text-2xl font-bold text-white">{dataStats.rules}</p>
-          </div>
-          <div className="bg-dark-bg rounded-lg p-4 border border-dark-border">
-            <p className="text-gray-400 text-sm mb-1">Data Size</p>
-            <p className="text-2xl font-bold text-white">
-              {Number((dataStats.totalSize || 0) / 1024).toFixed(1)} KB
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {/* Export/Import Actions */}
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-semibold text-blue-400 mb-3 flex items-center space-x-2">
-              <Cloud className="w-4 h-4" />
-              <span>Backup & Restore</span>
-            </h3>
-            <div className="space-y-2">
-            </div>
-          </div>
-
-          {/* File Export/Import */}
-          <div className="bg-gold-500/10 border border-gold-500/20 rounded-lg p-4 mb-4">
-            <h3 className="text-sm font-semibold text-gold-400 mb-3 flex items-center space-x-2">
-              <Cloud className="w-4 h-4" />
-              <span>File Backup (Transfer Between Devices)</span>
-            </h3>
-            <div className="space-y-2">
-              <button
-                onClick={handleExport}
-                className="w-full flex items-center justify-center space-x-2 bg-gold-500 hover:bg-gold-600 text-black font-semibold px-4 py-2.5 rounded-lg transition-colors"
-              >
-                <Download className="w-5 h-5" />
-                <span>Download Backup File (JSON)</span>
-              </button>
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full flex items-center justify-center space-x-2 bg-gold-600 hover:bg-gold-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
-              >
-                <Upload className="w-5 h-5" />
-                <span>Upload Backup File</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-red-400 mb-3">⚠️ Danger Zone</h3>
+        <button
+          onClick={() => setIsDangerZoneOpen(!isDangerZoneOpen)}
+          className="w-full flex items-center justify-between p-6 hover:bg-red-500/5 transition-colors"
+        >
+          <h2 className="text-xl font-semibold text-red-400">Danger Zone</h2>
+          {isDangerZoneOpen ? (
+            <ChevronDown className="w-5 h-5 text-red-400" />
+          ) : (
+            <ChevronRight className="w-5 h-5 text-red-400" />
+          )}
+        </button>
+        
+        {isDangerZoneOpen && (
+          <div className="px-6 pb-6">
             <button
               onClick={handleClearAllData}
               className="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
@@ -387,38 +295,7 @@ const Settings = () => {
               <span>Clear All Data</span>
             </button>
           </div>
-        </div>
-
-        <div className="mt-6 space-y-3">
-          <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-gray-300">
-                <p className="font-semibold text-yellow-400 mb-1">💾 Backup Strategy</p>
-                <ul className="list-disc list-inside space-y-1 mt-2">
-                  <li><strong>Local Save:</strong> Quick save on this device only</li>
-                  <li><strong>File Download:</strong> Download backup to transfer to phone/other laptop</li>
-                  <li><strong>Auto-Save:</strong> Data auto-saves every 5 minutes</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-            <div className="flex items-start space-x-3">
-              <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-gray-300">
-                <p className="font-semibold text-blue-400 mb-1">📱 Using on Multiple Devices</p>
-                <ol className="list-decimal list-inside space-y-1 mt-2">
-                  <li>On Laptop: Click "Download Backup File"</li>
-                  <li>Transfer file to Phone (email/cloud/USB)</li>
-                  <li>On Phone: Open app → Settings → "Upload Backup File"</li>
-                  <li>Your data is now synced!</li>
-                </ol>
-              </div>
-            </div>
-          </div>
-        </div>
+        )}
       </motion.div>
 
       {/* Save Button */}
@@ -435,7 +312,7 @@ const Settings = () => {
         </button>
       </div>
 
-      {/* About */}
+      {/* Footer */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -443,14 +320,50 @@ const Settings = () => {
         className="bg-dark-card border border-dark-border rounded-xl p-6 text-center"
       >
         <h2 className="text-2xl font-bold text-gold-500 mb-2">Trading Journal Pro+</h2>
-        <p className="text-gray-400 mb-4">Version 1.0.0</p>
-        <p className="text-sm text-gray-500">
-          Built by Aryan Patel for professional traders
-        </p>
-        <p className="text-xs text-gray-600 mt-2">
-          All data is stored locally in your browser
-        </p>
+        <p className="text-gray-400 mb-2">Version 1.0.0</p>
+        <p className="text-sm text-gray-500">All data stored locally</p>
       </motion.div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-dark-card border border-red-500/50 rounded-xl p-6 max-w-md w-full"
+          >
+            <h3 className="text-xl font-bold text-red-400 mb-4">⚠️ Confirm Data Deletion</h3>
+            <p className="text-gray-300 mb-4">
+              This will permanently delete ALL your data including trades, reflections, and rules. This action cannot be undone.
+            </p>
+            <p className="text-white mb-4">
+              Type <span className="font-bold text-red-400">DELETE</span> to confirm:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type DELETE"
+              className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-red-500 focus:border-transparent mb-4"
+            />
+            <div className="flex space-x-3">
+              <button
+                onClick={closeDeleteModal}
+                className="flex-1 bg-dark-bg hover:bg-dark-bg/80 border border-dark-border text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmClearAllData}
+                disabled={deleteConfirmText !== 'DELETE'}
+                className="flex-1 bg-red-600 hover:bg-red-700 disabled:bg-red-600/50 disabled:cursor-not-allowed text-white font-semibold px-4 py-2.5 rounded-lg transition-colors"
+              >
+                Delete All Data
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };
