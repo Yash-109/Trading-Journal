@@ -2,7 +2,8 @@
 // Handlers: createTrade, getTrades, getTradeById, updateTrade, deleteTrade
 
 import Trade from '../models/Trade.js';
-import { calculateQuantityFromLots, getContractSize } from '../../config/indianMarket.js';
+import { getPositionSize } from '../../config/contractSpecs.js';
+import { calculatePnL, calculateRiskReward } from '../../utils/pnlCalculator.js';
 import { getTradeCurrencyFromPair } from '../utils/getTradeCurrencyFromPair.js';
 import { getTodayUsdInrRate } from '../services/exchangeRateService.js';
 
@@ -42,54 +43,49 @@ export const createTrade = async (req, res) => {
     } = req.body;
     
     // Calculate actual quantity from lots for Indian INDEX/FNO
+    // Using centralized position size calculator
     let actualQuantity = quantity;
-    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO') && lots) {
-      actualQuantity = calculateQuantityFromLots(symbol, lots);
+    let effectiveLotSize = lotSize;
+    
+    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO')) {
+      // For Indian F&O, lots field is used
+      effectiveLotSize = lots;
+      actualQuantity = getPositionSize({ 
+        market, 
+        symbol, 
+        instrumentType, 
+        lotSize: lots 
+      });
+    } else if (market === 'INDIAN' && instrumentType === 'EQUITY') {
+      // For Indian equity, quantity is used directly
+      effectiveLotSize = quantity;
+      actualQuantity = quantity;
     }
     
-    // Calculate P/L and R:R
+    // Calculate P&L using centralized calculator
     let calculatedPnl = pnl || 0;
     let calculatedRr = rr || 0;
     
     if (entry && exit) {
-      const entryPrice = parseFloat(entry);
-      const exitPrice = parseFloat(exit);
+      // Use centralized P&L calculator
+      calculatedPnl = calculatePnL({
+        market,
+        symbol: symbol || pair,
+        instrumentType,
+        entryPrice: entry,
+        exitPrice: exit,
+        lotSize: effectiveLotSize,
+        direction
+      });
       
-      // P/L calculation based on market type
-      if (market === 'INDIAN' && actualQuantity) {
-        const qty = parseFloat(actualQuantity);
-        // Indian market: quantity-based calculation (no charges)
-        if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * qty;
-        } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * qty;
-        }
-      } else if (lotSize && (market === 'FOREX' || market === 'CRYPTO' || market === 'COMMODITY')) {
-        // FOREX/CRYPTO/COMMODITY: lot-based calculation with contract size
-        const lot = parseFloat(lotSize);
-        const contractSize = getContractSize(market, pair);
-        
-        if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * contractSize * lot;
-        } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * contractSize * lot;
-        }
-      }
-      
-      // R:R calculation (same for all markets)
+      // Calculate R:R using centralized calculator
       if (stopLoss && takeProfit) {
-        const slPrice = parseFloat(stopLoss);
-        const tpPrice = parseFloat(takeProfit);
-        
-        if (direction === 'Buy') {
-          const risk = entryPrice - slPrice;
-          const reward = tpPrice - entryPrice;
-          calculatedRr = risk !== 0 ? reward / risk : 0;
-        } else if (direction === 'Sell') {
-          const risk = slPrice - entryPrice;
-          const reward = entryPrice - tpPrice;
-          calculatedRr = risk !== 0 ? reward / risk : 0;
-        }
+        calculatedRr = calculateRiskReward({
+          entryPrice: entry,
+          stopLoss,
+          takeProfit,
+          direction
+        });
       }
     }
     
@@ -98,22 +94,19 @@ export const createTrade = async (req, res) => {
     const tradeCurrency = getTradeCurrencyFromPair({ pair, market, symbol });
     
     // Get account currency from request (defaults to USD)
-    // TODO: This should come from user settings in the future
     const accountCurrency = req.body.accountCurrency || 'USD';
     
-    // Determine exchange rate
-    let exchangeRateAtExecution = 1;
+    // ALWAYS fetch today's USD/INR rate, regardless of currency match
+    // This ensures correct conversion if user later changes their account currency
+    const todayRate = await getTodayUsdInrRate();
     
-    if (tradeCurrency !== accountCurrency) {
-      // Different currencies - fetch today's rate
-      const todayRate = await getTodayUsdInrRate();
-      
-      if (tradeCurrency === 'USD' && accountCurrency === 'INR') {
-        exchangeRateAtExecution = todayRate;
-      } else if (tradeCurrency === 'INR' && accountCurrency === 'USD') {
-        exchangeRateAtExecution = todayRate;
-      }
-    }
+    // Store the actual exchange rate at trade execution time
+    // This rate is immutable and will be used for all future conversions
+    let exchangeRateAtExecution = todayRate;
+    
+    // Note: We no longer skip fetching when currencies match
+    // Even if tradeCurrency === accountCurrency today, the user might switch later
+    // and we need the historical rate for accurate conversion
     // === END CURRENCY LOGIC ===
     
     // Create trade with userId from auth middleware
@@ -251,54 +244,49 @@ export const updateTrade = async (req, res) => {
     } = req.body;
 
     // Calculate actual quantity from lots for Indian INDEX/FNO
+    // Using centralized position size calculator
     let actualQuantity = quantity;
-    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO') && lots) {
-      actualQuantity = calculateQuantityFromLots(symbol, lots);
+    let effectiveLotSize = lotSize;
+    
+    if (market === 'INDIAN' && (instrumentType === 'INDEX' || instrumentType === 'FNO')) {
+      // For Indian F&O, lots field is used
+      effectiveLotSize = lots;
+      actualQuantity = getPositionSize({ 
+        market, 
+        symbol, 
+        instrumentType, 
+        lotSize: lots 
+      });
+    } else if (market === 'INDIAN' && instrumentType === 'EQUITY') {
+      // For Indian equity, quantity is used directly
+      effectiveLotSize = quantity;
+      actualQuantity = quantity;
     }
 
-    // Calculate P/L and R:R
+    // Calculate P&L using centralized calculator
     let calculatedPnl = pnl || 0;
     let calculatedRr = rr || 0;
     
     if (entry && exit) {
-      const entryPrice = parseFloat(entry);
-      const exitPrice = parseFloat(exit);
+      // Use centralized P&L calculator
+      calculatedPnl = calculatePnL({
+        market,
+        symbol: symbol || pair,
+        instrumentType,
+        entryPrice: entry,
+        exitPrice: exit,
+        lotSize: effectiveLotSize,
+        direction
+      });
       
-      // P/L calculation based on market type
-      if (market === 'INDIAN' && actualQuantity) {
-        const qty = parseFloat(actualQuantity);
-        // Indian market: quantity-based calculation (no charges)
-        if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * qty;
-        } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * qty;
-        }
-      } else if (lotSize && (market === 'FOREX' || market === 'CRYPTO' || market === 'COMMODITY')) {
-        // FOREX/CRYPTO/COMMODITY: lot-based calculation with contract size
-        const lot = parseFloat(lotSize);
-        const contractSize = getContractSize(market, pair);
-        
-        if (direction === 'Buy') {
-          calculatedPnl = (exitPrice - entryPrice) * contractSize * lot;
-        } else if (direction === 'Sell') {
-          calculatedPnl = (entryPrice - exitPrice) * contractSize * lot;
-        }
-      }
-      
-      // R:R calculation (same for all markets)
+      // Calculate R:R using centralized calculator
       if (stopLoss && takeProfit) {
-        const slPrice = parseFloat(stopLoss);
-        const tpPrice = parseFloat(takeProfit);
-        
-        if (direction === 'Buy') {
-          const risk = entryPrice - slPrice;
-          const reward = tpPrice - entryPrice;
-          calculatedRr = risk !== 0 ? reward / risk : 0;
-        } else if (direction === 'Sell') {
-          const risk = slPrice - entryPrice;
-          const reward = entryPrice - tpPrice;
-          calculatedRr = risk !== 0 ? reward / risk : 0;
-        }
+        calculatedRr = calculateRiskReward({
+          entryPrice: entry,
+          stopLoss,
+          takeProfit,
+          direction
+        });
       }
     }
 

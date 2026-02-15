@@ -33,7 +33,7 @@ const Dashboard = () => {
       ...trade,
       pnl: Number(trade?.pnl) || 0,
       tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
-      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || 1,
+      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
       date: trade?.date || new Date().toISOString(),
       displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
       direction: trade?.direction || 'Buy',

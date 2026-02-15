@@ -43,7 +43,7 @@ const Analytics = () => {
       ...trade,
       pnl: Number(trade?.pnl) || 0,
       tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
-      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || 1,
+      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
       market: trade?.market || 'FOREX',
       instrumentType: trade?.instrumentType,
       displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
