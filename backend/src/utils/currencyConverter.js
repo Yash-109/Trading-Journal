@@ -13,7 +13,7 @@
  * 
  * @param {number} pnl - Native P&L amount
  * @param {string} tradeCurrency - Currency of the trade ('USD' or 'INR')
- * @param {string} accountCurrency - User's selected account currency ('USD' or 'INR')
+ * @param {string} accountCurrency - User's selected account currency ('USD' or 'INR') 
  * @param {number} exchangeRateAtExecution - Exchange rate when trade was executed
  * @returns {number} Converted P&L in account currency
  */
@@ -33,17 +33,23 @@ function convertToAccountCurrency(
     return pnl;
   }
 
-  // Ensure we have a valid exchange rate
-  const rate = exchangeRateAtExecution || 1;
+  // Ensure we have a valid exchange rate - NO SILENT FALLBACK
+  if (!exchangeRateAtExecution || exchangeRateAtExecution <= 0 || isNaN(exchangeRateAtExecution)) {
+    console.error(
+      `Invalid exchange rate (${exchangeRateAtExecution}) for conversion: ${tradeCurrency} -> ${accountCurrency}. ` +
+      'Trade will display in original currency.'
+    );
+    return pnl; // Return original instead of converting with invalid rate
+  }
 
   // USD trade displayed in INR
   if (tradeCurrency === 'USD' && accountCurrency === 'INR') {
-    return pnl * rate;
+    return pnl * exchangeRateAtExecution;
   }
 
   // INR trade displayed in USD
   if (tradeCurrency === 'INR' && accountCurrency === 'USD') {
-    return pnl / rate;
+    return pnl / exchangeRateAtExecution;
   }
 
   // Fallback: return original P&L
@@ -70,7 +76,7 @@ function convertTradesArray(trades, accountCurrency) {
       trade.pnl,
       trade.tradeCurrency || 'USD', // fallback for old trades
       accountCurrency,
-      trade.exchangeRateAtExecution || 1
+      trade.exchangeRateAtExecution // Let converter handle invalid rates
     )
   }));
 }

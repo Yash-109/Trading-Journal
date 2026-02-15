@@ -98,22 +98,19 @@ export const createTrade = async (req, res) => {
     const tradeCurrency = getTradeCurrencyFromPair({ pair, market, symbol });
     
     // Get account currency from request (defaults to USD)
-    // TODO: This should come from user settings in the future
     const accountCurrency = req.body.accountCurrency || 'USD';
     
-    // Determine exchange rate
-    let exchangeRateAtExecution = 1;
+    // ALWAYS fetch today's USD/INR rate, regardless of currency match
+    // This ensures correct conversion if user later changes their account currency
+    const todayRate = await getTodayUsdInrRate();
     
-    if (tradeCurrency !== accountCurrency) {
-      // Different currencies - fetch today's rate
-      const todayRate = await getTodayUsdInrRate();
-      
-      if (tradeCurrency === 'USD' && accountCurrency === 'INR') {
-        exchangeRateAtExecution = todayRate;
-      } else if (tradeCurrency === 'INR' && accountCurrency === 'USD') {
-        exchangeRateAtExecution = todayRate;
-      }
-    }
+    // Store the actual exchange rate at trade execution time
+    // This rate is immutable and will be used for all future conversions
+    let exchangeRateAtExecution = todayRate;
+    
+    // Note: We no longer skip fetching when currencies match
+    // Even if tradeCurrency === accountCurrency today, the user might switch later
+    // and we need the historical rate for accurate conversion
     // === END CURRENCY LOGIC ===
     
     // Create trade with userId from auth middleware

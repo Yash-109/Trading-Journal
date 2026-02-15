@@ -211,6 +211,9 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
       }
     }
 
+    // Get user's account currency from settings
+    const accountCurrency = settings?.defaultCurrency || 'USD';
+
     // Normalize payload based on market type
     let payload;
     
@@ -233,6 +236,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         emotion: formData.emotion,
         tradeQuality: formData.tradeQuality,
         notes: formData.notes,
+        accountCurrency: accountCurrency, // Include account currency for proper exchange rate
       };
       
       // Add F&O specific fields
@@ -262,6 +266,7 @@ const TradeModal = ({ isOpen, onClose, trade = null }) => {
         tradeQuality: formData.tradeQuality,
         notes: formData.notes,
         date: formData.date,
+        accountCurrency: accountCurrency, // Include account currency for proper exchange rate
       };
     }
 
