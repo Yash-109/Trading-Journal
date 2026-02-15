@@ -2,6 +2,9 @@
  * Indian Market Configuration
  * Official NSE lot sizes for Index F&O instruments
  * 
+ * @deprecated This file is deprecated. Use contractSpecs.js and pnlCalculator.js instead.
+ * Keeping for backward compatibility only.
+ * 
  * Source: NSE India official specifications
  * Last updated: February 2026
  * 
@@ -9,26 +12,30 @@
  * Always verify with NSE official circulars for the most current lot sizes.
  */
 
+import { INDIAN_FNO_SPECS, getContractSize as getContractSizeNew } from './contractSpecs.js';
+
 /**
  * Lot sizes for Indian Index F&O instruments
  * Key: Index symbol (uppercase)
  * Value: Number of units per lot
+ * 
+ * Updated to match NSE specifications (February 2026)
  */
 export const INDEX_LOT_SIZES = {
   // NIFTY 50 Index F&O
-  NIFTY: 25,          // 25 units per lot (as of recent NSE specification)
+  NIFTY: 50,          // 50 units per lot (NSE specification)
   
   // BANK NIFTY Index F&O
-  BANKNIFTY: 15,      // 15 units per lot (as of recent NSE specification)
+  BANKNIFTY: 15,      // 15 units per lot (NSE specification)
   
   // FINNIFTY (Financial Services Index) F&O
-  FINNIFTY: 25,       // 25 units per lot (as of recent NSE specification)
+  FINNIFTY: 40,       // 40 units per lot (NSE specification)
   
   // SENSEX (BSE Index) F&O
   SENSEX: 10,         // 10 units per lot (BSE specification)
   
   // MIDCAP NIFTY Index F&O
-  MIDCPNIFTY: 50,     // 50 units per lot
+  MIDCPNIFTY: 75,     // 75 units per lot (NSE specification)
   
   // Default fallback for unknown indices
   DEFAULT: 1,
@@ -93,6 +100,8 @@ export const INDIAN_MARKET_CURRENCY = {
 /**
  * Contract sizes for FOREX, COMMODITY, and CRYPTO markets
  * These define how many units are in one standard lot
+ * 
+ * @deprecated Use contractSpecs.js instead
  */
 export const CONTRACT_SIZES = {
   // FOREX pairs (standard lot = 100,000 units of base currency)
@@ -124,23 +133,13 @@ export const CONTRACT_SIZES = {
 
 /**
  * Get contract size for a given market and pair/symbol
+ * @deprecated Use getContractSize from contractSpecs.js or pnlCalculator.js instead
+ * 
  * @param {string} market - Market type ('FOREX', 'COMMODITY', 'CRYPTO')
  * @param {string} pair - Trading pair/symbol (e.g., 'EURUSD', 'XAUUSD', 'BTCUSD')
  * @returns {number} Contract size (units per lot)
  */
 export const getContractSize = (market, pair) => {
-  if (!market || !pair) return 1;
-  
-  const upperMarket = market.toUpperCase();
-  const upperPair = pair.toUpperCase().trim();
-  
-  if (upperMarket === 'FOREX') {
-    return CONTRACT_SIZES.FOREX[upperPair] || CONTRACT_SIZES.FOREX.DEFAULT;
-  } else if (upperMarket === 'COMMODITY') {
-    return CONTRACT_SIZES.COMMODITY[upperPair] || CONTRACT_SIZES.COMMODITY.DEFAULT;
-  } else if (upperMarket === 'CRYPTO') {
-    return CONTRACT_SIZES.CRYPTO[upperPair] || CONTRACT_SIZES.CRYPTO.DEFAULT;
-  }
-  
-  return 1;
+  // Use new centralized function for accurate results
+  return getContractSizeNew({ market, symbol: pair });
 };
