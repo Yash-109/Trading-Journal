@@ -65,6 +65,30 @@ select:focus {
   ring-color: #f59e0b;
 }
 
+/* Date Input Calendar Icon - Dark Mode Fix */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.2);
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: invert(1) brightness(1.5);
+}
+
+input[type="date"]:focus::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(5) hue-rotate(15deg) brightness(1.2);
+  opacity: 1;
+}
+
+/* Firefox date input support */
+input[type="date"] {
+  color-scheme: dark;
+  -moz-appearance: textfield;
+}
+
 /* Card Hover Effects */
 .card-hover {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
