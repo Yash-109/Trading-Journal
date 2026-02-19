@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { useTrades, useTradeStats } from '../hooks/useTrades';
 import StatCard from '../components/StatCard';
 import { 
@@ -14,108 +15,77 @@ import {
   BarChart3
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, subDays, isAfter, isBefore, parseISO } from 'date-fns';
-import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
-import { convertTradesArray, getTotalPnL, getWinLossStats } from '../utils/currencyConverter';
+import { format } from 'date-fns';
 
 const Dashboard = () => {
-  const { trades: rawTrades = [], reflections = [], settings } = useApp();
-  
-  // Get account currency from settings with safe fallback
-  const accountCurrency = settings?.defaultCurrency || 'USD';
-  
-  // Get normalized trades and statistics using centralized hooks
+  const { trades: rawTrades = [], reflections = [] } = useApp();
+  const { selectedCurrency, convertTradePnL, formatCurrency, exchangeRate } = useCurrency();
+
+  // STEP 1: Normalize raw trades (field mapping, type coercion, lot size calc)
   const trades = useTrades(rawTrades);
-  
-  // Defensively normalize trades before conversion
-  const safeTrades = useMemo(() => {
+
+  // STEP 2 — SINGLE CONVERSION PASS
+  // Convert each trade's PNL using its stored historical rate.
+  // `pnl` is overwritten so useTradeStats sees already-converted values.
+  // Dependency on `exchangeRate` ensures a re-render when the live rate updates.
+  const convertedTrades = useMemo(() => {
     return (trades || []).map(trade => {
-      // Determine trade currency if missing - infer from market, NOT from accountCurrency!
-      let tradeCurrency = trade?.tradeCurrency;
-      if (!tradeCurrency) {
-        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
-        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
-      }
-      
+      if (!trade) return null;
+      const converted = convertTradePnL(trade); // uses exchangeRateAtExecution
       return {
         ...trade,
-        pnl: Number(trade?.pnl) || 0,
-        tradeCurrency,
-        exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
-        date: trade?.date || new Date().toISOString(),
-        displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
-        direction: trade?.direction || 'Buy',
-        rr: Number(trade?.rr) || 0,
-        emotion: trade?.emotion || 'Neutral',
-        ruleFollowed: Boolean(trade?.ruleFollowed),
-        convertedPnl: 0 // Will be set by conversion
+        // Override pnl so useTradeStats calculates in display currency
+        pnl: converted,
+        convertedPnl: converted,
+        // Ensure classification flags are consistent with converted value
+        isWin: converted > 0,
+        isLoss: converted < 0,
+        isBreakeven: converted === 0 && (trade.exit || 0) > 0,
       };
-    });
-  }, [trades, accountCurrency]);
-  
-  // Convert all trades to account currency
-  const convertedTrades = useMemo(() => {
-    return convertTradesArray(safeTrades, accountCurrency);
-  }, [safeTrades, accountCurrency]);
-  
+    }).filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trades, selectedCurrency, exchangeRate]);
+
+  // STEP 3: Stats are now in display currency — no further conversion needed
   const stats = useTradeStats(convertedTrades);
 
-  // Equity curve data - shows cumulative P/L over time (in account currency)
+  // STEP 4: Equity curve — cumulative sum from already-converted PNL values
+  // No additional conversion here; convertedPnl is already in display currency.
   const equityData = useMemo(() => {
-    // Guard: Check if we have trades
     if (!convertedTrades || convertedTrades.length === 0) return [];
-    
-    // Sort trades by date (oldest first) for cumulative calculation
+
     const sortedTrades = [...convertedTrades]
-      .filter(t => t && t.date) // Remove invalid trades
+      .filter(t => t && t.date)
       .sort((a, b) => {
-        try {
-          return new Date(a.date) - new Date(b.date);
-        } catch {
-          return 0;
-        }
+        try { return new Date(a.date) - new Date(b.date); }
+        catch { return 0; }
       });
-    
+
     let cumulative = 0;
-    
     return sortedTrades.map((trade, index) => {
-      const pnlValue = Number(trade?.convertedPnl) || 0;
+      const pnlValue = Number(trade.pnl) || 0;
       cumulative += isFinite(pnlValue) ? pnlValue : 0;
-      
-      // Safe date formatting
-      let dateStr = 'N/A';
-      try {
-        dateStr = format(new Date(trade.date), 'MMM dd');
-      } catch {
-        dateStr = `Trade ${index + 1}`;
-      }
-      
-      return {
-        date: dateStr,
-        equity: Number(cumulative) || 0,
-        trade: index + 1,
-      };
-    }).filter(d => d && isFinite(d.equity)); // Remove invalid data points
+
+      let dateStr = `Trade ${index + 1}`;
+      try { dateStr = format(new Date(trade.date), 'MMM dd'); } catch { /* noop */ }
+
+      return { date: dateStr, equity: Number(cumulative) || 0, trade: index + 1 };
+    }).filter(d => d && isFinite(d.equity));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [convertedTrades]);
 
-  // Recent trades - sorted by date (newest first)
+  // STEP 5: Recent trades — already converted, just slice
   const recentTrades = useMemo(() => {
-    // Guard: Check if we have trades
     if (!convertedTrades || convertedTrades.length === 0) return [];
-    
     return [...convertedTrades]
-      .filter(t => t && t.date) // Remove invalid trades
+      .filter(t => t && t.date)
       .sort((a, b) => {
-        try {
-          return new Date(b.date) - new Date(a.date);
-        } catch {
-          return 0;
-        }
+        try { return new Date(b.date) - new Date(a.date); }
+        catch { return 0; }
       })
       .slice(0, 5);
   }, [convertedTrades]);
 
-  // Trading quotes
   const quotes = [
     "Discipline is the bridge between goals and accomplishment.",
     "The market is a device for transferring money from the impatient to the patient.",
@@ -124,7 +94,6 @@ const Dashboard = () => {
     "Your trading system is only as good as your ability to follow it.",
     "Loss is part of the game. Accept it and move forward.",
   ];
-
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
 
   return (
@@ -134,9 +103,9 @@ const Dashboard = () => {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
           <p className="text-gray-400">
-            Welcome back! Here's your trading overview. 
+            Welcome back! Here's your trading overview.
             <span className="ml-2 text-gold-500 font-medium">
-              All metrics shown in {accountCurrency}
+              All metrics shown in {selectedCurrency}
             </span>
           </p>
         </div>
@@ -183,9 +152,9 @@ const Dashboard = () => {
         />
         <StatCard
           title="Total P/L"
-          value={formatPnLWithCurrency(Number(stats?.totalPnL) || 0, accountCurrency)}
+          value={formatCurrency(stats.totalPnL || 0, true)}
           icon={DollarSign}
-          color={(stats?.totalPnL || 0) >= 0 ? 'profit' : 'loss'}
+          color={(stats.totalPnL || 0) >= 0 ? 'profit' : 'loss'}
         />
       </div>
 
@@ -201,22 +170,22 @@ const Dashboard = () => {
           <div className="space-y-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Winning Trades</span>
-              <span className="text-profit font-semibold">{Number(stats?.winningTrades) || 0}</span>
+              <span className="text-profit font-semibold">{stats.winningTrades || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Losing Trades</span>
-              <span className="text-loss font-semibold">{Number(stats?.losingTrades) || 0}</span>
+              <span className="text-loss font-semibold">{stats.losingTrades || 0}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Best Trade</span>
               <span className="text-profit font-semibold">
-                {formatPnLWithCurrency(Number(stats?.bestTrade) || 0, accountCurrency)}
+                {formatCurrency(stats.bestTrade || 0, true)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Worst Trade</span>
               <span className="text-loss font-semibold">
-                {formatPnLWithCurrency(Number(stats?.worstTrade) || 0, accountCurrency)}
+                {formatCurrency(stats.worstTrade || 0, false)}
               </span>
             </div>
           </div>
@@ -236,8 +205,8 @@ const Dashboard = () => {
             </div>
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Avg Profit/Trade</span>
-              <span className={`font-semibold ${(stats?.avgPnL || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                {formatPnLWithCurrency(Number(stats?.avgPnL) || 0, accountCurrency)}
+              <span className={`font-semibold ${(stats.avgPnL || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+                {formatCurrency(stats.avgPnL || 0, true)}
               </span>
             </div>
             <div className="flex justify-between items-center">
@@ -327,6 +296,7 @@ const Dashboard = () => {
                   borderRadius: '8px',
                 }}
                 labelStyle={{ color: '#e5e7eb' }}
+                formatter={(value) => [formatCurrency(value, true), 'Equity']}
               />
               <Line
                 type="monotone"
@@ -375,7 +345,8 @@ const Dashboard = () => {
                   const tradeDate = trade?.date || new Date().toISOString();
                   const displayPair = trade?.displayPair || trade?.pair || trade?.symbol || 'N/A';
                   const direction = trade?.direction || 'Buy';
-                  const convertedPnl = Number(trade?.convertedPnl) || 0;
+                  // trade.pnl is already in display currency (converted in useMemo above)
+                  const displayPnl = Number(trade?.pnl) || 0;
                   const rr = Number(trade?.rr) || 0;
                   const emotion = trade?.emotion || 'N/A';
                   const ruleFollowed = Boolean(trade?.ruleFollowed);
@@ -399,8 +370,8 @@ const Dashboard = () => {
                           {direction}
                         </span>
                       </td>
-                      <td className={`py-3 px-4 text-sm font-semibold ${convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {formatPnLWithCurrency(convertedPnl, accountCurrency)}
+                      <td className={`py-3 px-4 text-sm font-semibold ${displayPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
+                        {formatCurrency(displayPnl, true)}
                       </td>
                       <td className="py-3 px-4 text-sm text-gray-300">1:{rr.toFixed(2)}</td>
                       <td className="py-3 px-4 text-sm text-gray-300">{emotion}</td>

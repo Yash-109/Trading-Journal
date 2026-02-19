@@ -15,34 +15,30 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
-import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
-import { convertTradesArray } from '../utils/currencyConverter';
+import { formatPnLWithCurrency } from '../utils/currencyFormatter';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Journal = () => {
-  const { trades: rawTrades = [], deleteTrade, addTrade, settings } = useApp();
-  
-  // Get account currency from settings
-  const accountCurrency = settings.defaultCurrency || 'USD';
-  
+  const { trades: rawTrades = [], deleteTrade, addTrade } = useApp();
+  const { selectedCurrency, convertTradePnL, formatCurrency, exchangeRate } = useCurrency();
+
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
-  
-  // Fix tradeCurrency for any trades missing it
-  const tradesWithCurrency = useMemo(() => {
-    return (normalizedTrades || []).map(trade => {
-      let tradeCurrency = trade?.tradeCurrency;
-      if (!tradeCurrency) {
-        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
-        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
-      }
-      return { ...trade, tradeCurrency };
-    });
-  }, [normalizedTrades]);
-  
-  // Convert trades to account currency
+
+  // SINGLE CONVERSION PASS — pnl becomes display-currency value
+  // Keep originalPnl + tradeCurrency for the native hint
   const convertedTrades = useMemo(() => {
-    return convertTradesArray(tradesWithCurrency, accountCurrency);
-  }, [tradesWithCurrency, accountCurrency]);
+    return (normalizedTrades || []).map(trade => {
+      if (!trade) return null;
+      const displayPnl = convertTradePnL(trade);
+      return {
+        ...trade,
+        convertedPnl: displayPnl, // display value
+        // keep original pnl untouched for native-currency hint
+      };
+    }).filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedTrades, selectedCurrency, exchangeRate]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -321,9 +317,9 @@ const Journal = () => {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">P/L</p>
                   <p className={`text-sm font-bold ${trade.convertedPnl >= 0 ? 'text-profit' : 'text-loss'}`}>
-                    {formatPnLWithCurrency(trade.convertedPnl, accountCurrency)}
+                    {formatCurrency(trade.convertedPnl, true)}
                   </p>
-                  {trade.tradeCurrency && trade.tradeCurrency !== accountCurrency && (
+                  {trade.tradeCurrency && trade.tradeCurrency !== selectedCurrency && (
                     <p className="text-xs text-gray-500 mt-1">
                       {formatPnLWithCurrency(trade.pnl, trade.tradeCurrency)}
                     </p>
