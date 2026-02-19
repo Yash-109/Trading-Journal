@@ -22,56 +22,47 @@ import { Download, TrendingUp, TrendingDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import toast from 'react-hot-toast';
 import { computeDecisionQualityAnalytics } from '../utils/decisionQualityAnalytics';
-import { formatPnLWithSign, formatPnLWithCurrency, getCurrencySymbol } from '../utils/currencyFormatter';
-import { convertTradesArray } from '../utils/currencyConverter';
+import { useCurrency } from '../context/CurrencyContext';
 
 const Analytics = () => {
-  const { trades: rawTrades = [], settings } = useApp();
-  
-  // Get account currency from settings with safe fallback
-  const accountCurrency = settings?.defaultCurrency || 'USD';
-  
-  // Get currency symbol for display
-  const currencySymbol = getCurrencySymbol(accountCurrency);
-  
-  // Get normalized trades using centralized hook
+  const { trades: rawTrades = [] } = useApp();
+  const { selectedCurrency, convertTradePnL, formatCurrency, getCurrencySymbol, exchangeRate } = useCurrency();
+
+  // Currency symbol for chart axis / tooltips
+  const currencySymbol = getCurrencySymbol();
+
+  // STEP 1: Normalize raw trades
   const normalizedTrades = useTrades(rawTrades);
-  
-  // Defensively normalize trades before conversion
-  const safeTrades = useMemo(() => {
+
+  // STEP 2 — SINGLE CONVERSION PASS
+  // Override pnl with the display-currency value so all downstream
+  // calculations naturally produce display-currency totals.
+  // Dependency on `exchangeRate` ensures re-render when live rate loads.
+  const convertedTrades = useMemo(() => {
     return (normalizedTrades || []).map(trade => {
-      // Determine trade currency if missing - infer from market, NOT from accountCurrency
-      let tradeCurrency = trade?.tradeCurrency;
-      
-      // If tradeCurrency is missing, infer from market
-      if (!tradeCurrency) {
-        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
-        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
-      }
-      
+      if (!trade) return null;
+      const converted = convertTradePnL(trade); // uses exchangeRateAtExecution
       return {
         ...trade,
-        pnl: Number(trade?.pnl) || 0,
-        tradeCurrency,
-        exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
-        market: trade?.market || 'FOREX',
-        instrumentType: trade?.instrumentType,
-        displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
-        emotion: trade?.emotion || 'Neutral',
-        session: trade?.session || 'Unknown',
-        strategy: trade?.strategy || 'None',
-        ruleFollowed: Boolean(trade?.ruleFollowed),
-        optionType: trade?.optionType,
-        strikePrice: Number(trade?.strikePrice) || 0,
-        expiryDate: trade?.expiryDate
+        pnl: converted,
+        convertedPnl: converted,
+        isWin: converted > 0,
+        isLoss: converted < 0,
+        isBreakeven: converted === 0 && (trade.exit || 0) > 0,
+        market: trade.market || 'FOREX',
+        instrumentType: trade.instrumentType,
+        displayPair: trade.displayPair || trade.pair || trade.symbol || 'Unknown',
+        emotion: trade.emotion || 'Neutral',
+        session: trade.session || 'Unknown',
+        strategy: trade.strategy || 'None',
+        ruleFollowed: Boolean(trade.ruleFollowed),
+        optionType: trade.optionType,
+        strikePrice: Number(trade.strikePrice) || 0,
+        expiryDate: trade.expiryDate,
       };
-    });
-  }, [normalizedTrades, accountCurrency]);
-  
-  // Convert all trades to account currency for analytics
-  const convertedTrades = useMemo(() => {
-    return convertTradesArray(safeTrades, accountCurrency);
-  }, [safeTrades, accountCurrency]);
+    }).filter(Boolean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [normalizedTrades, selectedCurrency, exchangeRate]);
 
   // Analytics calculations from converted trades
   const analytics = useMemo(() => {
@@ -342,7 +333,8 @@ const Analytics = () => {
       // Decision Quality Analytics
       decisionQuality: decisionQualityAnalytics,
     };
-  }, [convertedTrades, accountCurrency]); // accountCurrency added for explicit re-computation on currency change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convertedTrades, selectedCurrency, exchangeRate]);
 
   const exportPDF = () => {
     try {
@@ -365,17 +357,17 @@ const Analytics = () => {
       
       pdf.setFontSize(10);
       const totalPL = convertedTrades.reduce((sum, t) => {
-        const pnl = Number(t?.convertedPnl) || 0;
+        const pnl = Number(t?.pnl) || 0;
         return sum + (isFinite(pnl) ? pnl : 0);
       }, 0);
-      const wins = convertedTrades.filter(t => t && Number(t.convertedPnl) > 0).length;
+      const wins = convertedTrades.filter(t => t && Number(t.pnl) > 0).length;
       const winRate = convertedTrades.length > 0 ? (wins / convertedTrades.length) * 100 : 0;
       
       pdf.text(`Total Trades: ${convertedTrades.length || 0}`, 20, y);
       y += 7;
       pdf.text(`Win Rate: ${Number(winRate || 0).toFixed(1)}%`, 20, y);
       y += 7;
-      pdf.text(`Total P/L: ${formatPnLWithCurrency(Number(totalPL) || 0, accountCurrency)}`, 20, y);
+      pdf.text(`Total P/L: ${formatCurrency(Number(totalPL) || 0, true)}`, 20, y);
       y += 15;
 
       // Best Performing Pair
@@ -390,7 +382,7 @@ const Analytics = () => {
           const pl = Number(pair.pl) || 0;
           const winRate = Number(pair.winRate) || 0;
           const trades = pair.trades || 0;
-          pdf.text(`${pair.pair || 'Unknown'}: ${formatPnLWithCurrency(pl, accountCurrency)} (${winRate.toFixed(1)}% WR, ${trades} trades)`, 20, y);
+          pdf.text(`${pair.pair || 'Unknown'}: ${formatCurrency(pl, true)} (${winRate.toFixed(1)}% WR, ${trades} trades)`, 20, y);
           y += 7;
         });
       }
@@ -426,7 +418,7 @@ const Analytics = () => {
           <p className="text-gray-400">
             Deep dive into your trading performance. 
             <span className="ml-2 text-gold-500 font-medium">
-              All metrics in {accountCurrency}
+              All metrics in {selectedCurrency}
             </span>
           </p>
         </div>
@@ -686,13 +678,13 @@ const Analytics = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={`font-semibold ${(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.avgPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.avgPnl) || 0, true)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
                     <span className={`font-bold text-lg ${(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.totalPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleFollowed?.totalPnl) || 0, true)}
                     </span>
                   </div>
                 </div>
@@ -718,13 +710,13 @@ const Analytics = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={`font-semibold ${(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.avgPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.avgPnl) || 0, true)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Total P/L:</span>
                     <span className={`font-bold text-lg ${(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.totalPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.ruleComparison?.ruleBroken?.totalPnl) || 0, true)}
                     </span>
                   </div>
                 </div>
@@ -756,7 +748,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={(analytics?.decisionQuality?.qualityBuckets?.poor?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.poor?.avgPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.poor?.avgPnl) || 0, true)}
                     </span>
                   </div>
                 </div>
@@ -777,7 +769,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={(analytics?.decisionQuality?.qualityBuckets?.average?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.average?.avgPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.average?.avgPnl) || 0, true)}
                     </span>
                   </div>
                 </div>
@@ -798,7 +790,7 @@ const Analytics = () => {
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-400">Avg P/L:</span>
                     <span className={(analytics?.decisionQuality?.qualityBuckets?.good?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.good?.avgPnl) || 0, accountCurrency)}
+                      {formatCurrency(Number(analytics?.decisionQuality?.qualityBuckets?.good?.avgPnl) || 0, true)}
                     </span>
                   </div>
                 </div>
@@ -837,12 +829,12 @@ const Analytics = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${(emotion?.avgPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithCurrency(Number(emotion?.avgPnl) || 0, accountCurrency)}
+                          {formatCurrency(Number(emotion?.avgPnl) || 0, true)}
                         </span>
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-bold ${(emotion?.totalPnl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithCurrency(Number(emotion?.totalPnl) || 0, accountCurrency)}
+                          {formatCurrency(Number(emotion?.totalPnl) || 0, true)}
                         </span>
                       </td>
                     </tr>
@@ -891,7 +883,7 @@ const Analytics = () => {
                     }}
                   >
                     <div style={{ fontWeight: 600, marginBottom: 4 }}>{label}</div>
-                    <div style={{ fontSize: 12 }}>Net P/L: {formatPnLWithCurrency(value, accountCurrency)}</div>
+                    <div style={{ fontSize: 12 }}>Net P/L: {formatCurrency(value, true)}</div>
                   </div>
                 );
               }}
@@ -972,7 +964,7 @@ const Analytics = () => {
                     {payload.map((entry, index) => (
                       <div key={index} style={{ fontSize: 12 }}>
                         {entry.name === 'Profit/Loss' 
-                          ? `P/L: ${formatPnLWithCurrency(Number(entry.value) || 0, accountCurrency)}`
+                          ? `P/L: ${formatCurrency(Number(entry.value) || 0, true)}`
                           : `${entry.name}: ${Number(entry.value || 0).toFixed(1)}%`
                         }
                       </div>
@@ -1016,7 +1008,7 @@ const Analytics = () => {
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-400">P/L</span>
                   <span className={(emotion?.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                    {formatPnLWithCurrency(Number(emotion?.pl) || 0, accountCurrency)}
+                    {formatCurrency(Number(emotion?.pl) || 0, true)}
                   </span>
                 </div>
               </div>
@@ -1058,7 +1050,7 @@ const Analytics = () => {
                       </td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${(strategy?.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithCurrency(Number(strategy?.pl) || 0, accountCurrency)}
+                          {formatCurrency(Number(strategy?.pl) || 0, true)}
                         </span>
                       </td>
                     </tr>
@@ -1102,7 +1094,7 @@ const Analytics = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-400">P/L</span>
                     <span className={(option.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}>
-                      {formatPnLWithCurrency(Number(option.pl || 0), accountCurrency)}
+                      {formatCurrency(Number(option.pl || 0), true)}
                     </span>
                   </div>
                 </div>
@@ -1141,7 +1133,7 @@ const Analytics = () => {
                       <td className="py-3 px-4 text-gray-300">{strike.count}</td>
                       <td className="py-3 px-4">
                         <span className={`font-semibold ${(strike.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                          {formatPnLWithCurrency(Number(strike.pl || 0), accountCurrency)}
+                          {formatCurrency(Number(strike.pl || 0), true)}
                         </span>
                       </td>
                     </tr>
@@ -1189,7 +1181,7 @@ const Analytics = () => {
                     </td>
                     <td className="py-3 px-4">
                       <span className={`font-semibold ${(expiry.pl || 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
-                        {formatPnLWithCurrency(Number(expiry.pl || 0), accountCurrency)}
+                        {formatCurrency(Number(expiry.pl || 0), true)}
                       </span>
                     </td>
                   </tr>
