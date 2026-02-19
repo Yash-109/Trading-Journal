@@ -27,10 +27,22 @@ const Journal = () => {
   // Get normalized trades using centralized hook
   const normalizedTrades = useTrades(rawTrades);
   
+  // Fix tradeCurrency for any trades missing it
+  const tradesWithCurrency = useMemo(() => {
+    return (normalizedTrades || []).map(trade => {
+      let tradeCurrency = trade?.tradeCurrency;
+      if (!tradeCurrency) {
+        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
+        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
+      }
+      return { ...trade, tradeCurrency };
+    });
+  }, [normalizedTrades]);
+  
   // Convert trades to account currency
   const convertedTrades = useMemo(() => {
-    return convertTradesArray(normalizedTrades, accountCurrency);
-  }, [normalizedTrades, accountCurrency]);
+    return convertTradesArray(tradesWithCurrency, accountCurrency);
+  }, [tradesWithCurrency, accountCurrency]);
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
@@ -63,7 +75,7 @@ const Journal = () => {
       return matchesSearch && matchesPair && matchesDirection && 
              matchesEmotion && matchesStrategy && matchesRules;
     }).sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [normalizedTrades, searchTerm, filters]);
+  }, [convertedTrades, searchTerm, filters]);
 
   const handleEdit = (trade) => {
     setSelectedTrade(trade);

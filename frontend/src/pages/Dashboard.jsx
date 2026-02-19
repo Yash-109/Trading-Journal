@@ -29,19 +29,28 @@ const Dashboard = () => {
   
   // Defensively normalize trades before conversion
   const safeTrades = useMemo(() => {
-    return (trades || []).map(trade => ({
-      ...trade,
-      pnl: Number(trade?.pnl) || 0,
-      tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
-      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
-      date: trade?.date || new Date().toISOString(),
-      displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
-      direction: trade?.direction || 'Buy',
-      rr: Number(trade?.rr) || 0,
-      emotion: trade?.emotion || 'Neutral',
-      ruleFollowed: Boolean(trade?.ruleFollowed),
-      convertedPnl: 0 // Will be set by conversion
-    }));
+    return (trades || []).map(trade => {
+      // Determine trade currency if missing - infer from market, NOT from accountCurrency!
+      let tradeCurrency = trade?.tradeCurrency;
+      if (!tradeCurrency) {
+        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
+        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
+      }
+      
+      return {
+        ...trade,
+        pnl: Number(trade?.pnl) || 0,
+        tradeCurrency,
+        exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
+        date: trade?.date || new Date().toISOString(),
+        displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
+        direction: trade?.direction || 'Buy',
+        rr: Number(trade?.rr) || 0,
+        emotion: trade?.emotion || 'Neutral',
+        ruleFollowed: Boolean(trade?.ruleFollowed),
+        convertedPnl: 0 // Will be set by conversion
+      };
+    });
   }, [trades, accountCurrency]);
   
   // Convert all trades to account currency

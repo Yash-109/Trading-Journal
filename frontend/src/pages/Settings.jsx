@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { 
@@ -24,9 +24,13 @@ const Settings = () => {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const fileInputRef = useRef(null);
 
+  // Sync localSettings with context settings when they change
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
+
   const handleSave = async () => {
     await updateSettings(localSettings);
-    toast.success('Settings saved successfully');
   };
 
   const handleAddPair = () => {

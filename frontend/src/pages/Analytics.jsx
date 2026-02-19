@@ -39,22 +39,33 @@ const Analytics = () => {
   
   // Defensively normalize trades before conversion
   const safeTrades = useMemo(() => {
-    return (normalizedTrades || []).map(trade => ({
-      ...trade,
-      pnl: Number(trade?.pnl) || 0,
-      tradeCurrency: trade?.tradeCurrency || accountCurrency || 'USD',
-      exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
-      market: trade?.market || 'FOREX',
-      instrumentType: trade?.instrumentType,
-      displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
-      emotion: trade?.emotion || 'Neutral',
-      session: trade?.session || 'Unknown',
-      strategy: trade?.strategy || 'None',
-      ruleFollowed: Boolean(trade?.ruleFollowed),
-      optionType: trade?.optionType,
-      strikePrice: Number(trade?.strikePrice) || 0,
-      expiryDate: trade?.expiryDate
-    }));
+    return (normalizedTrades || []).map(trade => {
+      // Determine trade currency if missing - infer from market, NOT from accountCurrency
+      let tradeCurrency = trade?.tradeCurrency;
+      
+      // If tradeCurrency is missing, infer from market
+      if (!tradeCurrency) {
+        tradeCurrency = trade?.market === 'INDIAN' ? 'INR' : 'USD';
+        console.warn(`⚠️ Trade missing tradeCurrency, inferred: ${tradeCurrency}`, trade);
+      }
+      
+      return {
+        ...trade,
+        pnl: Number(trade?.pnl) || 0,
+        tradeCurrency,
+        exchangeRateAtExecution: Number(trade?.exchangeRateAtExecution) || undefined,
+        market: trade?.market || 'FOREX',
+        instrumentType: trade?.instrumentType,
+        displayPair: trade?.displayPair || trade?.pair || trade?.symbol || 'Unknown',
+        emotion: trade?.emotion || 'Neutral',
+        session: trade?.session || 'Unknown',
+        strategy: trade?.strategy || 'None',
+        ruleFollowed: Boolean(trade?.ruleFollowed),
+        optionType: trade?.optionType,
+        strikePrice: Number(trade?.strikePrice) || 0,
+        expiryDate: trade?.expiryDate
+      };
+    });
   }, [normalizedTrades, accountCurrency]);
   
   // Convert all trades to account currency for analytics
@@ -331,7 +342,7 @@ const Analytics = () => {
       // Decision Quality Analytics
       decisionQuality: decisionQualityAnalytics,
     };
-  }, [safeTrades, convertedTrades]);
+  }, [convertedTrades, accountCurrency]); // accountCurrency added for explicit re-computation on currency change
 
   const exportPDF = () => {
     try {
