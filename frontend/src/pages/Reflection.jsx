@@ -42,9 +42,30 @@ const Reflection = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    await addReflection(formData);
-    setIsModalOpen(false);
-    setSelectedDate(formData.date);
+    
+    // Trim whitespace from all text fields
+    const trimmedData = {
+      ...formData,
+      whatWentWell: formData.whatWentWell?.trim() || '',
+      mistakes: formData.mistakes?.trim() || '',
+      improvement: formData.improvement?.trim() || ''
+    };
+    
+    // Validate that at least one field has content
+    const hasContent = trimmedData.whatWentWell || 
+                       trimmedData.mistakes || 
+                       trimmedData.improvement;
+    
+    if (!hasContent) {
+      alert('Please fill in at least one reflection field before saving.');
+      return;
+    }
+    
+    const success = await addReflection(trimmedData);
+    if (success) {
+      setIsModalOpen(false);
+      setSelectedDate(trimmedData.date);
+    }
   };
 
   const handleEdit = () => {
@@ -336,7 +357,6 @@ const Reflection = () => {
                         placeholder={prompt.placeholder}
                         rows="4"
                         className="w-full bg-dark-bg border border-dark-border rounded-lg px-4 py-2 text-white focus:ring-2 focus:ring-gold-500 focus:border-transparent resize-none"
-                        required
                       />
                     </div>
                   ))}

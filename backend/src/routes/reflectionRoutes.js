@@ -1,9 +1,14 @@
 // Reflection routes
-// Routes: GET /reflections, POST /reflections, PUT /reflections/:date, DELETE /reflections/:date
+// Routes: GET /reflections, POST /reflections, PUT /reflections/:id, DELETE /reflections/:id
 
 import express from 'express';
 import { protect } from '../middleware/auth.js';
-import { createReflection, getReflections } from '../controllers/reflectionController.js';
+import { 
+  createReflection, 
+  getReflections, 
+  updateReflection, 
+  deleteReflection 
+} from '../controllers/reflectionController.js';
 
 const router = express.Router();
 
@@ -16,8 +21,10 @@ router.get('/', getReflections);
 // POST /api/reflections - Create new reflection
 router.post('/', createReflection);
 
-// Additional routes can be added here:
-// PUT /api/reflections/:date
-// DELETE /api/reflections/:date
+// PUT /api/reflections/:id - Update a reflection
+router.put('/:id', updateReflection);
+
+// DELETE /api/reflections/:id - Delete a reflection
+router.delete('/:id', deleteReflection);
 
 export default router;

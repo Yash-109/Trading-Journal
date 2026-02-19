@@ -15,6 +15,7 @@ import authRoutes from './routes/authRoutes.js';
 import tradeRoutes from './routes/tradeRoutes.js';
 import ruleRoutes from './routes/ruleRoutes.js';
 import reflectionRoutes from './routes/reflectionRoutes.js';
+import exchangeRateRoutes from './routes/exchangeRateRoutes.js';
 import evaluationRoutes from '../routes/evaluationRoutes.js';
 
 // Initialize Express app
@@ -41,6 +42,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/trades', tradeRoutes);
 app.use('/api/rules', ruleRoutes);
 app.use('/api/reflections', reflectionRoutes);
+app.use('/api/exchange-rate', exchangeRateRoutes);
 app.use('/api/evaluate', evaluationRoutes);
 
 // 404 handler for undefined routes
