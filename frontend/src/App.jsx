@@ -17,6 +17,7 @@ import TradeEvaluation from './pages/TradeEvaluation';
 import SessionEvaluation from './pages/SessionEvaluation';
 import { AppProvider } from './context/AppContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 
 // Protected Route wrapper component
 const ProtectedRoute = ({ children }) => {
@@ -68,7 +69,8 @@ function App() {
   return (
     <AuthProvider>
       <AppProvider>
-        <Router>
+        <CurrencyProvider>
+          <Router>
           <Routes>
             {/* Public Routes */}
             <Route
@@ -156,6 +158,7 @@ function App() {
             }}
           />
         </Router>
+        </CurrencyProvider>
       </AppProvider>
     </AuthProvider>
   );
