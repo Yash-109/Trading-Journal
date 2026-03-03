@@ -120,7 +120,12 @@ const Journal = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Trade Journal</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white">Trade Journal</h1>
+            <span className="bg-gold-500/20 text-gold-400 border border-gold-500/30 rounded-full px-3 py-1 text-sm font-semibold">
+              {normalizedTrades.length} Trades
+            </span>
+          </div>
           <p className="text-gray-400">Log and manage all your trades</p>
         </div>
         <button
