@@ -309,19 +309,21 @@ const Reflection = () => {
                     </label>
                     <div className="grid grid-cols-5 gap-3">
                       {Object.entries(moodEmojis).map(([mood, emoji]) => (
-                        <button
+                        <motion.button
                           key={mood}
                           type="button"
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.95 }}
                           onClick={() => setFormData({ ...formData, mood })}
                           className={`p-4 rounded-lg border-2 transition-all ${
                             formData.mood === mood
-                              ? 'border-gold-500 bg-gold-500/20'
-                              : 'border-dark-border bg-dark-bg hover:border-gray-600'
+                              ? 'border-gold-500 bg-gold-500/20 shadow-[0_0_12px_rgba(234,179,8,0.35)]'
+                              : 'border-dark-border bg-dark-bg hover:border-gray-600 hover:bg-dark-hover'
                           }`}
                         >
                           <div className="text-3xl mb-1">{emoji}</div>
                           <div className="text-xs text-gray-400 capitalize">{mood}</div>
-                        </button>
+                        </motion.button>
                       ))}
                     </div>
                   </div>
