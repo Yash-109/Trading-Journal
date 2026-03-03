@@ -134,6 +134,30 @@ const Dashboard = () => {
         </div>
       </motion.div>
 
+      {/* Streak Banner */}
+      {stats.currentStreak > 1 && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.05 }}
+          className={`flex items-center space-x-3 rounded-xl p-4 border ${
+            stats.streakType === 'win'
+              ? 'bg-gradient-to-r from-gold-500/10 to-amber-500/5 border-gold-500/20'
+              : 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/20'
+          }`}
+        >
+          <span className="text-2xl">{stats.streakType === 'win' ? '🔥' : '❄️'}</span>
+          <div>
+            <p className={`font-semibold ${stats.streakType === 'win' ? 'text-gold-400' : 'text-red-400'}`}>
+              {stats.currentStreak}-Trade {stats.streakType === 'win' ? 'Win' : 'Loss'} Streak
+            </p>
+            <p className="text-xs text-gray-500">
+              {stats.streakType === 'win' ? 'Keep up the momentum!' : 'Focus on your process, not the outcomes.'}
+            </p>
+          </div>
+        </motion.div>
+      )}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
