@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -16,6 +16,16 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+
+const TRADING_QUOTES = [
+  "Discipline is the bridge between goals and accomplishment.",
+  "The market is a device for transferring money from the impatient to the patient.",
+  "Risk comes from not knowing what you're doing.",
+  "The goal of a successful trader is to make the best trades. Money is secondary.",
+  "Your trading system is only as good as your ability to follow it.",
+  "Cut your losses short and let your winners run.",
+  "Be fearful when others are greedy, and greedy when others are fearful.",
+];
 
 const Dashboard = () => {
   const { trades: rawTrades = [], reflections = [] } = useApp();
@@ -86,15 +96,9 @@ const Dashboard = () => {
       .slice(0, 5);
   }, [convertedTrades]);
 
-  const quotes = [
-    "Discipline is the bridge between goals and accomplishment.",
-    "The market is a device for transferring money from the impatient to the patient.",
-    "Risk comes from not knowing what you're doing.",
-    "The goal of a successful trader is to make the best trades. Money is secondary.",
-    "Your trading system is only as good as your ability to follow it.",
-    "Loss is part of the game. Accept it and move forward.",
-  ];
-  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  const [randomQuote] = useState(
+    () => TRADING_QUOTES[Math.floor(Math.random() * TRADING_QUOTES.length)]
+  );
 
   return (
     <div className="space-y-6 animate-slide-in">
@@ -129,6 +133,30 @@ const Dashboard = () => {
           </div>
         </div>
       </motion.div>
+
+      {/* Streak Banner */}
+      {stats.currentStreak > 1 && (
+        <motion.div
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.05 }}
+          className={`flex items-center space-x-3 rounded-xl p-4 border ${
+            stats.streakType === 'win'
+              ? 'bg-gradient-to-r from-gold-500/10 to-amber-500/5 border-gold-500/20'
+              : 'bg-gradient-to-r from-red-500/10 to-red-500/5 border-red-500/20'
+          }`}
+        >
+          <span className="text-2xl">{stats.streakType === 'win' ? '🔥' : '❄️'}</span>
+          <div>
+            <p className={`font-semibold ${stats.streakType === 'win' ? 'text-gold-400' : 'text-red-400'}`}>
+              {stats.currentStreak}-Trade {stats.streakType === 'win' ? 'Win' : 'Loss'} Streak
+            </p>
+            <p className="text-xs text-gray-500">
+              {stats.streakType === 'win' ? 'Keep up the momentum!' : 'Focus on your process, not the outcomes.'}
+            </p>
+          </div>
+        </motion.div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

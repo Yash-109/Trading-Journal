@@ -120,7 +120,12 @@ const Journal = () => {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Trade Journal</h1>
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white">Trade Journal</h1>
+            <span className="bg-gold-500/20 text-gold-400 border border-gold-500/30 rounded-full px-3 py-1 text-sm font-semibold">
+              {normalizedTrades.length} Trades
+            </span>
+          </div>
           <p className="text-gray-400">Log and manage all your trades</p>
         </div>
         <button
@@ -271,6 +276,17 @@ const Journal = () => {
                       {!trade.ruleFollowed && (
                         <span className="px-3 py-1 rounded-lg text-sm font-semibold bg-yellow-500/20 text-yellow-400">
                           Rules Broken
+                        </span>
+                      )}
+                      {trade.tradeQuality && (
+                        <span className={`px-3 py-1 rounded-lg text-sm font-semibold border ${
+                          ['A+', 'A'].includes(trade.tradeQuality)
+                            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                            : trade.tradeQuality === 'B'
+                            ? 'bg-gold-500/20 text-gold-400 border-gold-500/30'
+                            : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                        }`}>
+                          {trade.tradeQuality}
                         </span>
                       )}
                     </div>
