@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { useCurrency } from '../context/CurrencyContext';
@@ -16,6 +16,16 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+
+const TRADING_QUOTES = [
+  "Discipline is the bridge between goals and accomplishment.",
+  "The market is a device for transferring money from the impatient to the patient.",
+  "Risk comes from not knowing what you're doing.",
+  "The goal of a successful trader is to make the best trades. Money is secondary.",
+  "Your trading system is only as good as your ability to follow it.",
+  "Cut your losses short and let your winners run.",
+  "Be fearful when others are greedy, and greedy when others are fearful.",
+];
 
 const Dashboard = () => {
   const { trades: rawTrades = [], reflections = [] } = useApp();
@@ -86,15 +96,9 @@ const Dashboard = () => {
       .slice(0, 5);
   }, [convertedTrades]);
 
-  const quotes = [
-    "Discipline is the bridge between goals and accomplishment.",
-    "The market is a device for transferring money from the impatient to the patient.",
-    "Risk comes from not knowing what you're doing.",
-    "The goal of a successful trader is to make the best trades. Money is secondary.",
-    "Your trading system is only as good as your ability to follow it.",
-    "Loss is part of the game. Accept it and move forward.",
-  ];
-  const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+  const [randomQuote] = useState(
+    () => TRADING_QUOTES[Math.floor(Math.random() * TRADING_QUOTES.length)]
+  );
 
   return (
     <div className="space-y-6 animate-slide-in">
