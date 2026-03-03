@@ -278,6 +278,17 @@ const Journal = () => {
                           Rules Broken
                         </span>
                       )}
+                      {trade.tradeQuality && (
+                        <span className={`px-3 py-1 rounded-lg text-sm font-semibold border ${
+                          ['A+', 'A'].includes(trade.tradeQuality)
+                            ? 'bg-green-500/20 text-green-400 border-green-500/30'
+                            : trade.tradeQuality === 'B'
+                            ? 'bg-gold-500/20 text-gold-400 border-gold-500/30'
+                            : 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                        }`}>
+                          {trade.tradeQuality}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-gray-400">
                       {format(new Date(trade.date), 'EEEE, MMMM dd, yyyy')} • {trade.session} Session
