@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const response = await authAPI.login(email, password);
       
-      if (response.status === 'success' && response.data) {
+      if ((response.success || response.status === 'success') && response.data) {
         const userData = response.data.user;
         setUser(userData);
         setIsAuthenticated(true);
@@ -77,15 +77,26 @@ export const AuthProvider = ({ children }) => {
    * @param {string} password - User password
    * @returns {Promise<boolean>} - Success status
    */
-  const register = async (email, password) => {
+  const register = async (username, email, password) => {
     try {
-      const response = await authAPI.register(email, password);
+      const response = await authAPI.register(username, email, password);
       
-      if (response.status === 'success') {
-        toast.success(response.message || 'Registration successful! Please login.');
+      if (response.success || response.status === 'success') {
+        if (response.data?.token) {
+          localStorage.setItem('authToken', response.data.token);
+          const userData = {
+            userId: response.data.userId,
+            email: response.data.email,
+            username: response.data.username,
+          };
+          localStorage.setItem('user', JSON.stringify(userData));
+          setUser(userData);
+          setIsAuthenticated(true);
+        }
+        toast.success(response.message || 'Registration successful!');
         return true;
       } else {
-        toast.error('Registration failed');
+        toast.error(response.message || 'Registration failed');
         return false;
       }
     } catch (error) {
