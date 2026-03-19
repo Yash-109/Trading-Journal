@@ -28,6 +28,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Password is required'],
       minlength: [12, 'Password must be at least 12 characters']
+    },
+    // Email OTP 2FA status
+    is2FAEnabled: {
+      type: Boolean,
+      default: true
     }
   },
   {

@@ -1,258 +1,343 @@
-// Authentication controller with enhanced password security
-// Handlers: registerUser, loginUser, changePassword
-// Uses secure password validation and bcrypt hashing
-
-import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
 import User from '../models/User.js';
-import {
-  validatePassword,
-  hashPassword,
-  comparePassword,
-  changePassword as changePasswordService
-} from '../utils/passwordValidator.js';
+import LoginOtp from '../models/LoginOtp.js';
+import { validatePassword, hashPassword, comparePassword } from '../utils/passwordValidator.js';
+import { sendLoginOtpEmail } from '../services/emailService.js';
+
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_MAX_ATTEMPTS = 5;
+
+const generateSixDigitOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+
+const issueAuthToken = (userId) => {
+  return jwt.sign({ userId }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRE || '7d',
+  });
+};
+
+const buildSafeUser = (user) => ({
+  userId: user._id,
+  email: user.email,
+  username: user.username,
+  is2FAEnabled: user.is2FAEnabled,
+});
+
+const createAndSendOtp = async (user) => {
+  const otp = generateSixDigitOtp();
+  const otpHash = await bcrypt.hash(otp, 10);
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+
+  // Invalidate older pending OTPs so only latest one can be used.
+  await LoginOtp.updateMany(
+    { userId: user._id, used: false },
+    { $set: { used: true, usedAt: new Date() } }
+  );
+
+  await LoginOtp.create({
+    userId: user._id,
+    otpHash,
+    expiresAt,
+    attempts: 0,
+    maxAttempts: OTP_MAX_ATTEMPTS,
+    used: false,
+  });
+
+  const emailResult = await sendLoginOtpEmail({ to: user.email, otp });
+  return emailResult;
+};
 
 /**
- * Register a new user with secure password validation
  * POST /api/auth/register
- * 
- * Required fields:
- * - email: User email address
- * - username: User username (for password validation)
- * - password: User password (must meet security requirements)
+ * Register user with bcrypt-hashed password and 2FA enabled by default.
  */
 export const registerUser = async (req, res) => {
   try {
     const { email, username, password } = req.body;
 
-    // Validate input
-    if (!email || !password || !username) {
+    if (!email || !username || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email, username, and password are required'
+        message: 'Email, username, and password are required',
       });
     }
 
-    // Validate password against security requirements
     const passwordValidation = validatePassword(password, username, email);
     if (!passwordValidation.isValid) {
       return res.status(400).json({
         success: false,
         message: 'Password does not meet security requirements',
         errors: passwordValidation.errors,
-        strength: passwordValidation.strength
       });
     }
 
-    // Check if user already exists
     const existingUser = await User.findOne({
-      $or: [{ email }, { username }]
+      $or: [{ email: email.toLowerCase() }, { username }],
     });
 
     if (existingUser) {
-      const field = existingUser.email === email ? 'email' : 'username';
       return res.status(400).json({
         success: false,
-        message: `User already exists with this ${field}`
+        message:
+          existingUser.email === email.toLowerCase()
+            ? 'User already exists with this email'
+            : 'User already exists with this username',
       });
     }
 
-    // Hash the password securely
     const hashedPassword = await hashPassword(password);
 
-    // Create new user
     const user = await User.create({
-      email,
+      email: email.toLowerCase(),
       username,
-      password: hashedPassword
+      password: hashedPassword,
+      is2FAEnabled: true,
     });
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
-
-    // Return success response (without password)
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      data: {
-        userId: user._id,
-        email: user.email,
-        username: user.username,
-        token
-      }
+      data: buildSafeUser(user),
     });
   } catch (error) {
     console.error('Register error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Server error during registration'
+      message: 'Server error during registration',
     });
   }
 };
 
 /**
- * Login user with secure password verification
  * POST /api/auth/login
- * 
- * Required fields:
- * - email: User email address
- * - password: User password
+ * Step 1 of login: validate password, generate + email OTP.
  */
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email and password are required'
+        message: 'Email and password are required',
       });
     }
 
-    // Check if user exists
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email or password',
       });
     }
 
-    // Compare password securely using bcrypt
     const isPasswordValid = await comparePassword(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid email or password'
+        message: 'Invalid email or password',
       });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { userId: user._id },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRE || '7d' }
-    );
+    if (!user.is2FAEnabled) {
+      const token = issueAuthToken(user._id);
+      return res.status(200).json({
+        success: true,
+        message: 'Login successful',
+        data: {
+          token,
+          user: buildSafeUser(user),
+          requires2FA: false,
+        },
+      });
+    }
 
-    // Return success response with token
-    res.status(200).json({
+    try {
+      await createAndSendOtp(user);
+    } catch (emailError) {
+      console.error('OTP email delivery error:', emailError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Unable to deliver OTP email right now. Please check email settings and try again.',
+      });
+    }
+
+    return res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'OTP sent to your email',
       data: {
-        token,
-        user: {
-          userId: user._id,
-          email: user.email,
-          username: user.username
-        }
-      }
+        email: user.email,
+        requires2FA: true,
+        expiresIn: 300,
+        resendCooldown: 60,
+      },
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
-      message: 'Server error during login'
+      message: 'Server error during login',
     });
   }
 };
 
 /**
- * Change password with validation and secure updates
- * POST /api/auth/change-password
- * 
- * Required fields:
- * - currentPassword: Current password for verification
- * - newPassword: New password (must meet security requirements)
- * 
- * Requires: Authentication middleware
+ * POST /api/auth/verify-otp
+ * Step 2 of login: verify OTP, enforce expiry/attempts/single-use, issue JWT.
  */
-export const changePassword = async (req, res) => {
+export const verifyOtpAndLogin = async (req, res) => {
   try {
-    const { currentPassword, newPassword, newPasswordConfirm } = req.body;
-    const userId = req.user?.userId;
+    const { email, otp } = req.body;
 
-    // Validate input
-    if (!currentPassword || !newPassword || !newPasswordConfirm) {
+    if (!email || !otp) {
       return res.status(400).json({
         success: false,
-        message: 'Current password, new password, and confirmation are required'
+        message: 'Email and OTP are required',
       });
     }
 
-    // Verify new passwords match
-    if (newPassword !== newPasswordConfirm) {
+    if (!/^\d{6}$/.test(String(otp))) {
       return res.status(400).json({
         success: false,
-        message: 'New passwords do not match'
+        message: 'OTP must be a 6-digit code',
       });
     }
 
-    // Get user from database
-    const user = await User.findById(userId);
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'User not found',
       });
     }
 
-    // Verify current password
-    const isCurrentPasswordValid = await comparePassword(
-      currentPassword,
-      user.password
-    );
-    if (!isCurrentPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Current password is incorrect'
-      });
-    }
+    const otpRecord = await LoginOtp.findOne({ userId: user._id, used: false }).sort({ createdAt: -1 });
 
-    // Prevent reuse of current password
-    const isSameAsOld = await comparePassword(newPassword, user.password);
-    if (isSameAsOld) {
+    if (!otpRecord) {
       return res.status(400).json({
         success: false,
-        message: 'New password cannot be the same as current password'
+        message: 'No active OTP found. Please login again.',
       });
     }
 
-    // Validate and change password using the service
-    const result = await changePasswordService(
-      newPassword,
-      user.username,
-      user.email
-    );
+    if (otpRecord.expiresAt.getTime() < Date.now()) {
+      otpRecord.used = true;
+      otpRecord.usedAt = new Date();
+      await otpRecord.save();
 
-    if (!result.success) {
       return res.status(400).json({
         success: false,
-        message: result.error,
-        errors: result.errors
+        message: 'OTP has expired. Please request a new one.',
       });
     }
 
-    // Update user password
-    user.password = result.hashedPassword;
-    await user.save();
+    if (otpRecord.attempts >= otpRecord.maxAttempts) {
+      return res.status(429).json({
+        success: false,
+        message: 'OTP attempt limit reached. Please request a new OTP.',
+      });
+    }
 
-    res.status(200).json({
+    const isOtpValid = await bcrypt.compare(String(otp), otpRecord.otpHash);
+
+    if (!isOtpValid) {
+      otpRecord.attempts += 1;
+      await otpRecord.save();
+
+      const remaining = Math.max(otpRecord.maxAttempts - otpRecord.attempts, 0);
+      return res.status(400).json({
+        success: false,
+        message:
+          remaining > 0
+            ? `Invalid OTP. ${remaining} attempt(s) remaining.`
+            : 'OTP attempt limit reached. Please request a new OTP.',
+      });
+    }
+
+    otpRecord.used = true;
+    otpRecord.usedAt = new Date();
+    await otpRecord.save();
+
+    const token = issueAuthToken(user._id);
+
+    return res.status(200).json({
       success: true,
-      message: 'Password changed successfully',
+      message: 'Login successful',
       data: {
-        strength: result.strength
-      }
+        token,
+        user: buildSafeUser(user),
+      },
     });
   } catch (error) {
-    console.error('Change password error:', error);
-    res.status(500).json({
+    console.error('Verify OTP error:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Server error during password change'
+      message: 'Server error during OTP verification',
+    });
+  }
+};
+
+/**
+ * POST /api/auth/resend-otp
+ * Bonus flow: resend OTP with 60-second cooldown.
+ */
+export const resendLoginOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email is required',
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+    }
+
+    const latestOtp = await LoginOtp.findOne({ userId: user._id }).sort({ createdAt: -1 });
+    if (latestOtp) {
+      const elapsedMs = Date.now() - latestOtp.createdAt.getTime();
+      if (elapsedMs < OTP_RESEND_COOLDOWN_MS) {
+        const waitSeconds = Math.ceil((OTP_RESEND_COOLDOWN_MS - elapsedMs) / 1000);
+        return res.status(429).json({
+          success: false,
+          message: `Please wait ${waitSeconds} second(s) before requesting another OTP.`,
+          data: { retryAfter: waitSeconds },
+        });
+      }
+    }
+
+    try {
+      await createAndSendOtp(user);
+    } catch (emailError) {
+      console.error('Resend OTP email delivery error:', emailError.message);
+      return res.status(503).json({
+        success: false,
+        message: 'Unable to deliver OTP email right now. Please check email settings and try again.',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'A new OTP has been sent to your email',
+      data: {
+        email: user.email,
+        expiresIn: 300,
+        resendCooldown: 60,
+      },
+    });
+  } catch (error) {
+    console.error('Resend OTP error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while resending OTP',
     });
   }
 };

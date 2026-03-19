@@ -107,6 +107,35 @@ export const authAPI = {
     
     return data;
   },
+
+  /**
+   * Verify login OTP and complete authentication
+   * POST /api/auth/verify-otp
+   */
+  verifyOtp: async (email, otp) => {
+    const data = await apiRequest('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
+    });
+
+    if (data.data?.token) {
+      setToken(data.data.token);
+    }
+
+    return data;
+  },
+
+  /**
+   * Resend login OTP with cooldown policy
+   * POST /api/auth/resend-otp
+   */
+  resendOtp: async (email) => {
+    const data = await apiRequest('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+    return data;
+  },
 };
 
 // ============= TRADES API =============

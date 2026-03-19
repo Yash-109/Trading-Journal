@@ -72,7 +72,7 @@ const Register = () => {
       if (success) {
         toast.success('Account created successfully! Redirecting...');
         setTimeout(() => {
-          navigate('/dashboard');
+          navigate('/login');
         }, 1500);
       }
     } finally {
