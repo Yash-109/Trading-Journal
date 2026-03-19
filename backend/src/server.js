@@ -16,7 +16,7 @@ import tradeRoutes from './routes/tradeRoutes.js';
 import ruleRoutes from './routes/ruleRoutes.js';
 import reflectionRoutes from './routes/reflectionRoutes.js';
 import exchangeRateRoutes from './routes/exchangeRateRoutes.js';
-import evaluationRoutes from '../routes/evaluationRoutes.js';
+import evaluationRoutes from './routes/evaluationRoutes.js';
 
 // Initialize Express app
 const app = express();
