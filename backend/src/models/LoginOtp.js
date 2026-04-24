@@ -35,6 +35,11 @@ const loginOtpSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    type: {
+      type: String,
+      enum: ['login', 'reset'],
+      default: 'login',
+    },
   },
   {
     timestamps: true,

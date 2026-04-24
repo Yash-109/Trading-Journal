@@ -7,6 +7,9 @@ import {
 	loginUser,
 	verifyOtpAndLogin,
 	resendLoginOtp,
+	forgotPassword,
+	verifyResetOtp,
+	resetPassword
 } from '../controllers/authController.js';
 import { loginRateLimiter } from '../middleware/rateLimiter.js';
 
@@ -23,5 +26,14 @@ router.post('/verify-otp', verifyOtpAndLogin);
 
 // POST /api/auth/resend-otp - Resend OTP with cooldown
 router.post('/resend-otp', resendLoginOtp);
+
+// POST /api/auth/forgot-password - Request password reset OTP
+router.post('/forgot-password', loginRateLimiter, forgotPassword);
+
+// POST /api/auth/verify-reset-otp - Verify password reset OTP
+router.post('/verify-reset-otp', verifyResetOtp);
+
+// POST /api/auth/reset-password - Set new password
+router.post('/reset-password', resetPassword);
 
 export default router;
