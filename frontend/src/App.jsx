@@ -13,6 +13,7 @@ import Rules from './pages/Rules';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import TradeEvaluation from './pages/TradeEvaluation';
 import SessionEvaluation from './pages/SessionEvaluation';
 import { AppProvider } from './context/AppContext';
@@ -89,6 +90,7 @@ function App() {
                 </PublicRoute>
               }
             />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Protected Routes */}
             <Route

@@ -136,6 +136,27 @@ export const authAPI = {
     });
     return data;
   },
+
+  forgotPassword: async (email) => {
+    return await apiRequest('/auth/forgot-password', { 
+      method: 'POST', 
+      body: JSON.stringify({ email }) 
+    });
+  },
+  
+  verifyResetOtp: async (email, otp) => {
+    return await apiRequest('/auth/verify-reset-otp', { 
+      method: 'POST', 
+      body: JSON.stringify({ email, otp }) 
+    });
+  },
+
+  resetPassword: async (resetToken, newPassword) => {
+    return await apiRequest('/auth/reset-password', { 
+      method: 'POST', 
+      body: JSON.stringify({ resetToken, newPassword }) 
+    });
+  },
 };
 
 // ============= TRADES API =============

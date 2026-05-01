@@ -22,7 +22,7 @@ function safeNumber(value, defaultValue = 0) {
  * Validate if stop loss makes sense for the trade direction
  * For long trades: stopLoss should be < entryPrice
  * @param {number} stopLoss - Stop loss price
- * @param {number} entryPrice - Entry price
+ * @param {number} entryPrice - Entry price 
  * @param {number} exitPrice - Exit price
  * @returns {boolean} True if valid or indeterminate
  */
